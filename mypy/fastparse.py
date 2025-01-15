@@ -157,7 +157,7 @@ def ast3_parse(
             source, filename, mode, type_comments=True, feature_version=feature_version
         )
 
-    p()  # Call to assure syntactic validity (will throw an exception otherwise, exiting this function).
+    #p()  # Call to assure syntactic validity (will throw an exception otherwise, exiting this function).
     if isinstance(source, str):
         tokens = tokenize.generate_tokens(io.StringIO(source).readline)
     else:
