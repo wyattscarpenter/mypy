@@ -231,7 +231,7 @@ class Options:
 
         # Prohibit treating `bool` as `int` in subtyping contexts.
         # This makes `def a(b: int): ...; a(True)` an error.
-        self.strict_bool = False
+        self.strict_bool = True
 
         # Disable treating bytearray and memoryview as subtypes of bytes
         self.strict_bytes = False
