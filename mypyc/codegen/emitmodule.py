@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Iterable, List, Optional, Tuple, TypeVar
+from collections.abc import Iterable
+from typing import Optional, TypeVar
 
 from mypy.build import (
     BuildResult,
@@ -24,7 +25,7 @@ from mypy.fscache import FileSystemCache
 from mypy.nodes import MypyFile
 from mypy.options import Options
 from mypy.plugin import Plugin, ReportConfigContext
-from mypy.util import hash_digest
+from mypy.util import hash_digest, json_dumps
 from mypyc.codegen.cstring import c_string_initializer
 from mypyc.codegen.emit import Emitter, EmitterContext, HeaderDeclaration, c_array_initializer
 from mypyc.codegen.emitclass import generate_class, generate_class_type_decl
@@ -44,10 +45,8 @@ from mypyc.common import (
     TYPE_VAR_PREFIX,
     shared_lib_name,
     short_id_from_name,
-    use_vectorcall,
 )
 from mypyc.errors import Errors
-from mypyc.ir.class_ir import ClassIR
 from mypyc.ir.func_ir import FuncIR
 from mypyc.ir.module_ir import ModuleIR, ModuleIRs, deserialize_modules
 from mypyc.ir.ops import DeserMaps, LoadLiteral
@@ -62,6 +61,7 @@ from mypyc.transform.exceptions import insert_exception_handling
 from mypyc.transform.flag_elimination import do_flag_elimination
 from mypyc.transform.lower import lower_ir
 from mypyc.transform.refcount import insert_ref_count_opcodes
+from mypyc.transform.spill import insert_spills
 from mypyc.transform.uninit import insert_uninit_checks
 
 # All of the modules being compiled are divided into "groups". A group
@@ -84,11 +84,11 @@ from mypyc.transform.uninit import insert_uninit_checks
 # its modules along with the name of the group. (Which can be None
 # only if we are compiling only a single group with a single file in it
 # and not using shared libraries).
-Group = Tuple[List[BuildSource], Optional[str]]
-Groups = List[Group]
+Group = tuple[list[BuildSource], Optional[str]]
+Groups = list[Group]
 
 # A list of (file name, file contents) pairs.
-FileContents = List[Tuple[str, str]]
+FileContents = list[tuple[str, str]]
 
 
 class MarkedDeclaration:
@@ -154,7 +154,7 @@ class MypycPlugin(Plugin):
         ir_data = json.loads(ir_json)
 
         # Check that the IR cache matches the metadata cache
-        if compute_hash(meta_json) != ir_data["meta_hash"]:
+        if hash_digest(meta_json) != ir_data["meta_hash"]:
             return None
 
         # Check that all of the source files are present and as
@@ -229,6 +229,12 @@ def compile_scc_to_ir(
     if errors.num_errors > 0:
         return modules
 
+    env_user_functions = {}
+    for module in modules.values():
+        for cls in module.classes:
+            if cls.env_user_function:
+                env_user_functions[cls.env_user_function] = cls
+
     for module in modules.values():
         for fn in module.functions:
             # Insert uninit checks.
@@ -237,6 +243,10 @@ def compile_scc_to_ir(
             insert_exception_handling(fn)
             # Insert refcount handling.
             insert_ref_count_opcodes(fn)
+
+            if fn in env_user_functions:
+                insert_spills(fn, env_user_functions[fn])
+
             # Switch to lower abstraction level IR.
             lower_ir(fn, compiler_options)
             # Perform optimizations.
@@ -369,11 +379,11 @@ def write_cache(
         newpath = get_state_ir_cache_name(st)
         ir_data = {
             "ir": module.serialize(),
-            "meta_hash": compute_hash(meta_data),
+            "meta_hash": hash_digest(meta_data),
             "src_hashes": hashes[group_map[id]],
         }
 
-        result.manager.metastore.write(newpath, json.dumps(ir_data, separators=(",", ":")))
+        result.manager.metastore.write(newpath, json_dumps(ir_data))
 
     result.manager.metastore.commit()
 
@@ -398,7 +408,7 @@ def load_scc_from_cache(
 
 def compile_modules_to_c(
     result: BuildResult, compiler_options: CompilerOptions, errors: Errors, groups: Groups
-) -> tuple[ModuleIRs, list[FileContents]]:
+) -> tuple[ModuleIRs, list[FileContents], Mapper]:
     """Compile Python module(s) to the source of Python C extension modules.
 
     This generates the source code for the "shared library" module
@@ -428,12 +438,12 @@ def compile_modules_to_c(
 
     modules = compile_modules_to_ir(result, mapper, compiler_options, errors)
     if errors.num_errors > 0:
-        return {}, []
+        return {}, [], Mapper({})
 
     ctext = compile_ir_to_c(groups, modules, result, mapper, compiler_options)
     write_cache(modules, result, group_map, ctext)
 
-    return modules, [ctext[name] for _, name in groups]
+    return modules, [ctext[name] for _, name in groups], mapper
 
 
 def generate_function_declaration(fn: FuncIR, emitter: Emitter) -> None:
@@ -1075,20 +1085,6 @@ class GroupGenerator:
             )
 
 
-def sort_classes(classes: list[tuple[str, ClassIR]]) -> list[tuple[str, ClassIR]]:
-    mod_name = {ir: name for name, ir in classes}
-    irs = [ir for _, ir in classes]
-    deps: dict[ClassIR, set[ClassIR]] = {}
-    for ir in irs:
-        if ir not in deps:
-            deps[ir] = set()
-        if ir.base:
-            deps[ir].add(ir.base)
-        deps[ir].update(ir.traits)
-    sorted_irs = toposort(deps)
-    return [(mod_name[ir], ir) for ir in sorted_irs]
-
-
 T = TypeVar("T")
 
 
@@ -1120,7 +1116,7 @@ def is_fastcall_supported(fn: FuncIR, capi_version: tuple[int, int]) -> bool:
     if fn.class_name is not None:
         if fn.name == "__call__":
             # We can use vectorcalls (PEP 590) when supported
-            return use_vectorcall(capi_version)
+            return True
         # TODO: Support fastcall for __init__.
         return fn.name != "__init__"
     return True

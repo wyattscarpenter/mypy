@@ -9,7 +9,8 @@ import sys
 import tempfile
 import textwrap
 import unittest
-from typing import Any, Callable, Iterator
+from collections.abc import Iterator
+from typing import Any, Callable
 
 import mypy.stubtest
 from mypy.stubtest import parse_options, test_stubs
@@ -47,6 +48,11 @@ Callable: _SpecialForm = ...
 Generic: _SpecialForm = ...
 Protocol: _SpecialForm = ...
 Union: _SpecialForm = ...
+ClassVar: _SpecialForm = ...
+
+Final = 0
+Literal = 0
+TypedDict = 0
 
 class TypeVar:
     def __init__(self, name, covariant: bool = ..., contravariant: bool = ...) -> None: ...
@@ -70,6 +76,12 @@ class Match(Generic[AnyStr]): ...
 class Sequence(Iterable[_T_co]): ...
 class Tuple(Sequence[_T_co]): ...
 class NamedTuple(tuple[Any, ...]): ...
+class _TypedDict(Mapping[str, object]):
+    __required_keys__: ClassVar[frozenset[str]]
+    __optional_keys__: ClassVar[frozenset[str]]
+    __total__: ClassVar[bool]
+    __readonly_keys__: ClassVar[frozenset[str]]
+    __mutable_keys__: ClassVar[frozenset[str]]
 def overload(func: _T) -> _T: ...
 def type_check_only(func: _T) -> _T: ...
 def final(func: _T) -> _T: ...
@@ -93,6 +105,8 @@ class tuple(Sequence[T_co], Generic[T_co]):
     def __ge__(self, __other: tuple[T_co, ...]) -> bool: pass
 
 class dict(Mapping[KT, VT]): ...
+
+class frozenset(Generic[T]): ...
 
 class function: pass
 class ellipsis: pass
@@ -144,9 +158,9 @@ class Flag(Enum):
 """
 
 
-def run_stubtest(
+def run_stubtest_with_stderr(
     stub: str, runtime: str, options: list[str], config_file: str | None = None
-) -> str:
+) -> tuple[str, str]:
     with use_tmp_dir(TEST_MODULE_NAME) as tmp_dir:
         with open("builtins.pyi", "w") as f:
             f.write(stubtest_builtins_stub)
@@ -163,13 +177,26 @@ def run_stubtest(
                 f.write(config_file)
             options = options + ["--mypy-config-file", f"{TEST_MODULE_NAME}_config.ini"]
         output = io.StringIO()
-        with contextlib.redirect_stdout(output):
+        outerr = io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(outerr):
             test_stubs(parse_options([TEST_MODULE_NAME] + options), use_builtins_fixtures=True)
-        return remove_color_code(
-            output.getvalue()
-            # remove cwd as it's not available from outside
-            .replace(os.path.realpath(tmp_dir) + os.sep, "").replace(tmp_dir + os.sep, "")
-        )
+    filtered_output = remove_color_code(
+        output.getvalue()
+        # remove cwd as it's not available from outside
+        .replace(os.path.realpath(tmp_dir) + os.sep, "").replace(tmp_dir + os.sep, "")
+    )
+    filtered_outerr = remove_color_code(
+        outerr.getvalue()
+        # remove cwd as it's not available from outside
+        .replace(os.path.realpath(tmp_dir) + os.sep, "").replace(tmp_dir + os.sep, "")
+    )
+    return filtered_output, filtered_outerr
+
+
+def run_stubtest(
+    stub: str, runtime: str, options: list[str], config_file: str | None = None
+) -> str:
+    return run_stubtest_with_stderr(stub, runtime, options, config_file)[0]
 
 
 class Case:
@@ -311,6 +338,21 @@ class StubtestUnit(unittest.TestCase):
                 def __exit__(self, exc_type, exc_val, exc_tb): pass
             """,
             error=None,
+        )
+        yield Case(
+            stub="""def dunder_name(__x: int) -> None: ...""",
+            runtime="""def dunder_name(__x: int) -> None: ...""",
+            error=None,
+        )
+        yield Case(
+            stub="""def dunder_name_posonly(__x: int, /) -> None: ...""",
+            runtime="""def dunder_name_posonly(__x: int) -> None: ...""",
+            error=None,
+        )
+        yield Case(
+            stub="""def dunder_name_bad(x: int) -> None: ...""",
+            runtime="""def dunder_name_bad(__x: int) -> None: ...""",
+            error="dunder_name_bad",
         )
 
     @collect_cases
@@ -514,6 +556,18 @@ class StubtestUnit(unittest.TestCase):
             f11.__text_signature__ = "(text=<unrepresentable>)"
             """,
             error="f11",
+        )
+
+        # Simulate numpy ndarray.__bool__ that raises an error
+        yield Case(
+            stub="def f12(x=1): ...",
+            runtime="""
+            class _ndarray:
+                def __eq__(self, obj): return self
+                def __bool__(self): raise ValueError
+            def f12(x=_ndarray()) -> None: pass
+            """,
+            error="f12",
         )
 
     @collect_cases
@@ -894,6 +948,106 @@ class StubtestUnit(unittest.TestCase):
         )
 
     @collect_cases
+    def test_cached_property(self) -> Iterator[Case]:
+        yield Case(
+            stub="""
+            from functools import cached_property
+            class Good:
+                @cached_property
+                def read_only_attr(self) -> int: ...
+                @cached_property
+                def read_only_attr2(self) -> int: ...
+            """,
+            runtime="""
+            import functools as ft
+            from functools import cached_property
+            class Good:
+                @cached_property
+                def read_only_attr(self): return 1
+                @ft.cached_property
+                def read_only_attr2(self): return 1
+            """,
+            error=None,
+        )
+        yield Case(
+            stub="""
+            from functools import cached_property
+            class Bad:
+                @cached_property
+                def f(self) -> int: ...
+            """,
+            runtime="""
+            class Bad:
+                def f(self) -> int: return 1
+            """,
+            error="Bad.f",
+        )
+        yield Case(
+            stub="""
+            from functools import cached_property
+            class GoodCachedAttr:
+                @cached_property
+                def f(self) -> int: ...
+            """,
+            runtime="""
+            class GoodCachedAttr:
+                f = 1
+            """,
+            error=None,
+        )
+        yield Case(
+            stub="""
+            from functools import cached_property
+            class BadCachedAttr:
+                @cached_property
+                def f(self) -> str: ...
+            """,
+            runtime="""
+            class BadCachedAttr:
+                f = 1
+            """,
+            error="BadCachedAttr.f",
+        )
+        yield Case(
+            stub="""
+            from functools import cached_property
+            from typing import final
+            class FinalGood:
+                @cached_property
+                @final
+                def attr(self) -> int: ...
+            """,
+            runtime="""
+            from functools import cached_property
+            from typing import final
+            class FinalGood:
+                @cached_property
+                @final
+                def attr(self):
+                    return 1
+            """,
+            error=None,
+        )
+        yield Case(
+            stub="""
+            from functools import cached_property
+            class FinalBad:
+                @cached_property
+                def attr(self) -> int: ...
+            """,
+            runtime="""
+            from functools import cached_property
+            from typing_extensions import final
+            class FinalBad:
+                @cached_property
+                @final
+                def attr(self):
+                    return 1
+            """,
+            error="FinalBad.attr",
+        )
+
+    @collect_cases
     def test_var(self) -> Iterator[Case]:
         yield Case(stub="x1: int", runtime="x1 = 5", error=None)
         yield Case(stub="x2: str", runtime="x2 = 5", error="x2")
@@ -1154,9 +1308,9 @@ class StubtestUnit(unittest.TestCase):
         yield Case(
             stub="""
             class X(enum.Enum):
-                a: int
-                b: str
-                c: str
+                a = ...
+                b = "asdf"
+                c = "oops"
             """,
             runtime="""
             class X(enum.Enum):
@@ -1169,8 +1323,8 @@ class StubtestUnit(unittest.TestCase):
         yield Case(
             stub="""
             class Flags1(enum.Flag):
-                a: int
-                b: int
+                a = ...
+                b = 2
             def foo(x: Flags1 = ...) -> None: ...
             """,
             runtime="""
@@ -1184,8 +1338,8 @@ class StubtestUnit(unittest.TestCase):
         yield Case(
             stub="""
             class Flags2(enum.Flag):
-                a: int
-                b: int
+                a = ...
+                b = 2
             def bar(x: Flags2 | None = None) -> None: ...
             """,
             runtime="""
@@ -1199,8 +1353,8 @@ class StubtestUnit(unittest.TestCase):
         yield Case(
             stub="""
             class Flags3(enum.Flag):
-                a: int
-                b: int
+                a = ...
+                b = 2
             def baz(x: Flags3 | None = ...) -> None: ...
             """,
             runtime="""
@@ -1233,8 +1387,8 @@ class StubtestUnit(unittest.TestCase):
         yield Case(
             stub="""
             class Flags4(enum.Flag):
-                a: int
-                b: int
+                a = 1
+                b = 2
             def spam(x: Flags4 | None = None) -> None: ...
             """,
             runtime="""
@@ -1247,9 +1401,9 @@ class StubtestUnit(unittest.TestCase):
         )
         yield Case(
             stub="""
-            from typing_extensions import Final, Literal
+            from typing import Final, Literal
             class BytesEnum(bytes, enum.Enum):
-                a: bytes
+                a = b'foo'
             FOO: Literal[BytesEnum.a]
             BAR: Final = BytesEnum.a
             BAZ: BytesEnum
@@ -1290,7 +1444,7 @@ class StubtestUnit(unittest.TestCase):
             runtime="""
             __all__ = []
             Z = 5""",
-            error=None,
+            error="__all__",
         )
 
     @collect_cases
@@ -1330,7 +1484,7 @@ class StubtestUnit(unittest.TestCase):
             runtime="",
             error="h",
         )
-        yield Case(stub="", runtime="__all__ = []", error=None)  # dummy case
+        yield Case(stub="", runtime="__all__ = []", error="__all__")  # dummy case
         yield Case(stub="", runtime="__all__ += ['y']\ny = 5", error="y")
         yield Case(stub="", runtime="__all__ += ['g']\ndef g(): pass", error="g")
         # Here we should only check that runtime has B, since the stub explicitly re-exports it
@@ -1346,6 +1500,34 @@ class StubtestUnit(unittest.TestCase):
             stub="class Z: ...",
             runtime="__all__ += ['Z']\nclass Z:\n  def __reduce__(self): return (Z,)",
             error=None,
+        )
+        # __call__ exists on type, so it appears to exist on the class.
+        # This checks that we identify it as missing at runtime anyway.
+        yield Case(
+            stub="""
+            class ClassWithMetaclassOverride:
+                def __call__(*args, **kwds): ...
+            """,
+            runtime="class ClassWithMetaclassOverride: ...",
+            error="ClassWithMetaclassOverride.__call__",
+        )
+        # Test that we ignore object.__setattr__ and object.__delattr__ inheritance
+        yield Case(
+            stub="""
+            from typing import Any
+            class FakeSetattrClass:
+                def __setattr__(self, name: str, value: Any, /) -> None: ...
+            """,
+            runtime="class FakeSetattrClass: ...",
+            error="FakeSetattrClass.__setattr__",
+        )
+        yield Case(
+            stub="""
+            class FakeDelattrClass:
+                def __delattr__(self, name: str, /) -> None: ...
+            """,
+            runtime="class FakeDelattrClass: ...",
+            error="FakeDelattrClass.__delattr__",
         )
 
     @collect_cases
@@ -1410,12 +1592,11 @@ assert annotations
             runtime="class C:\n  def __init_subclass__(cls, e=1, **kwargs): pass",
             error=None,
         )
-        if sys.version_info >= (3, 9):
-            yield Case(
-                stub="class D:\n  def __class_getitem__(cls, type: type) -> type: ...",
-                runtime="class D:\n  def __class_getitem__(cls, type): ...",
-                error=None,
-            )
+        yield Case(
+            stub="class D:\n  def __class_getitem__(cls, type: type) -> type: ...",
+            runtime="class D:\n  def __class_getitem__(cls, type): ...",
+            error=None,
+        )
 
     @collect_cases
     def test_not_subclassable(self) -> Iterator[Case]:
@@ -1780,11 +1961,11 @@ assert annotations
     def test_good_literal(self) -> Iterator[Case]:
         yield Case(
             stub=r"""
-            from typing_extensions import Literal
+            from typing import Literal
 
             import enum
             class Color(enum.Enum):
-                RED: int
+                RED = ...
 
             NUM: Literal[1]
             CHAR: Literal['a']
@@ -1812,7 +1993,7 @@ assert annotations
 
     @collect_cases
     def test_bad_literal(self) -> Iterator[Case]:
-        yield Case("from typing_extensions import Literal", "", None)  # dummy case
+        yield Case("from typing import Literal", "", None)  # dummy case
         yield Case(
             stub="INT_FLOAT_MISMATCH: Literal[1]",
             runtime="INT_FLOAT_MISMATCH = 1.0",
@@ -1863,7 +2044,7 @@ assert annotations
         )
         yield Case(
             stub="""
-            from typing_extensions import TypedDict
+            from typing import TypedDict
 
             class _Options(TypedDict):
                 a: str
@@ -1884,8 +2065,8 @@ assert annotations
     @collect_cases
     def test_runtime_typing_objects(self) -> Iterator[Case]:
         yield Case(
-            stub="from typing_extensions import Protocol, TypedDict",
-            runtime="from typing_extensions import Protocol, TypedDict",
+            stub="from typing import Protocol, TypedDict",
+            runtime="from typing import Protocol, TypedDict",
             error=None,
         )
         yield Case(
@@ -2250,8 +2431,8 @@ assert annotations
         )
         # The same is true for NamedTuples and TypedDicts:
         yield Case(
-            stub="from typing_extensions import NamedTuple, TypedDict",
-            runtime="from typing_extensions import NamedTuple, TypedDict",
+            stub="from typing import NamedTuple, TypedDict",
+            runtime="from typing import NamedTuple, TypedDict",
             error=None,
         )
         yield Case(
@@ -2476,6 +2657,46 @@ class StubtestMiscUnit(unittest.TestCase):
         )
         output = run_stubtest(stub=stub, runtime=runtime, options=[], config_file=config_file)
         assert output == "Success: no issues found in 1 module\n"
+
+    def test_config_file_error_codes(self) -> None:
+        runtime = "temp = 5\n"
+        stub = "temp = SOME_GLOBAL_CONST"
+        output = run_stubtest(stub=stub, runtime=runtime, options=[])
+        assert output == (
+            "error: not checking stubs due to mypy build errors:\n"
+            'test_module.pyi:1: error: Name "SOME_GLOBAL_CONST" is not defined  [name-defined]\n'
+        )
+
+        config_file = "[mypy]\ndisable_error_code = name-defined\n"
+        output = run_stubtest(stub=stub, runtime=runtime, options=[], config_file=config_file)
+        assert output == "Success: no issues found in 1 module\n"
+
+    def test_config_file_error_codes_invalid(self) -> None:
+        runtime = "temp = 5\n"
+        stub = "temp: int\n"
+        config_file = "[mypy]\ndisable_error_code = not-a-valid-name\n"
+        output, outerr = run_stubtest_with_stderr(
+            stub=stub, runtime=runtime, options=[], config_file=config_file
+        )
+        assert output == "Success: no issues found in 1 module\n"
+        assert outerr == (
+            "test_module_config.ini: [mypy]: disable_error_code: "
+            "Invalid error code(s): not-a-valid-name\n"
+        )
+
+    def test_config_file_wrong_incomplete_feature(self) -> None:
+        runtime = "x = 1\n"
+        stub = "x: int\n"
+        config_file = "[mypy]\nenable_incomplete_feature = Unpack\n"
+        output = run_stubtest(stub=stub, runtime=runtime, options=[], config_file=config_file)
+        assert output == (
+            "warning: Warning: Unpack is already enabled by default\n"
+            "Success: no issues found in 1 module\n"
+        )
+
+        config_file = "[mypy]\nenable_incomplete_feature = not-a-valid-name\n"
+        with self.assertRaises(SystemExit):
+            run_stubtest(stub=stub, runtime=runtime, options=[], config_file=config_file)
 
     def test_no_modules(self) -> None:
         output = io.StringIO()
