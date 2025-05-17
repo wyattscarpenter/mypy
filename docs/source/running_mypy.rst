@@ -303,7 +303,8 @@ If you are getting this error, try to obtain type hints for the library you're u
             follow_untyped_imports = true
 
 If you are unable to find any existing type hints nor have time to write your
-own, you can instead *suppress* the errors.
+own nor find ``--follow-untyped-imports`` satisfactory (which is a likely
+situation), you can instead *suppress* the errors.
 
 All this will do is make mypy stop reporting an error on the line containing the
 import: the imported module will continue to be of type ``Any``, and mypy may
@@ -312,38 +313,8 @@ not catch errors in its use.
 1.  To suppress a *single* missing import error, add a ``# type: ignore`` at the end of the
     line containing the import.
 
-2.  To suppress *all* missing import errors from a single library, add
-    a per-module section to your :ref:`mypy config file <config-file>` setting
-    :confval:`ignore_missing_imports` to True for that library. For example,
-    suppose your codebase
-    makes heavy use of an (untyped) library named ``foobar``. You can silence
-    all import errors associated with that library and that library alone by
-    adding the following section to your config file:
-
-    .. tab:: mypy.ini
-
-        .. code-block:: ini
-
-            [mypy-foobar.*]
-            ignore_missing_imports = True
-
-    .. tab:: pyproject.toml
-
-        .. code-block:: toml
-
-            [[tool.mypy.overrides]]
-            module = ["foobar.*"]
-            ignore_missing_imports = true
-
-    Note: this option is equivalent to adding a ``# type: ignore`` to every
-    import of ``foobar`` in your codebase. For more information, see the
-    documentation about configuring
-    :ref:`import discovery <config-file-import-discovery>` in config files.
-    The ``.*`` after ``foobar`` will ignore imports of ``foobar`` modules
-    and subpackages in addition to the ``foobar`` top-level package namespace.
-
-3.  To suppress *all* missing import errors for *all* untyped libraries
-    in your codebase, use :option:`--disable-error-code=import-untyped <mypy --ignore-missing-imports>`.
+2.  To suppress this message for *all* untyped libraries
+    in your codebase, use :option:`--disable-error-code=import-untyped <mypy --disable-error-code>`.
     See :ref:`code-import-untyped` for more details on this error code.
 
     You can also set :confval:`disable_error_code`, like so:
@@ -381,30 +352,38 @@ the library, you will get a message like this:
     main.py:1: note: Hint: "python3 -m pip install types-PyYAML"
     main.py:1: note: (or run "mypy --install-types" to install all missing stub packages)
 
-You can resolve the issue by running the suggested pip commands.
-
-If you're running mypy in CI, you can ensure the presence of any stub packages
-you need the same as you would any other test dependency, e.g. by adding them to
-the appropriate ``requirements.txt`` file or dependency section of ``pyproject.toml``.
+You can resolve the immediate issue for your local environment by running the
+suggested pip commands. However,
+the recommended way to deal with this sort of error is to take all of mypy's
+suggestions of stub packages to install (in the above example, types-PyYAML),
+and add them to your project's dependencies, wherever you normally keep your
+test dependencies (eg, ``requirements.txt`` or an (optional-)dependency section
+of ``pyproject.toml``). This is especially useful for  `CI/CD
+<https://en.wikipedia.org/wiki/CI/CD>`_ pipelines, as it will make your builds
+and automated typechecks reproducible.
 
 The :option:`--install-types <mypy --install-types>` flag
-makes mypy list and (after a prompt) install all known missing stubs:
+makes mypy list and (after a prompt) install all known missing stubs, and then
+type check your code:
 
 .. code-block:: text
 
     mypy --install-types
 
-This is slower than explicitly installing stubs, since it effectively
+
+(Use :option:`--non-interactive <mypy --non-interactive>` to install all
+suggested stub packages without asking for confirmation.)
+This is slower than a normal run of mypy, since it effectively
 runs mypy twice — the first time to find the missing stubs, and
 the second time to type check your code properly after mypy has
 installed the stubs. It also can make controlling stub versions harder,
 resulting in less reproducible type checking — it might even install
 incompatible versions of your project's non-type dependencies, if the
-type stubs require them!
-
-By default, :option:`--install-types <mypy --install-types>` shows a confirmation prompt.
-Use :option:`--non-interactive <mypy --non-interactive>` to install all suggested
-stub packages without asking for confirmation *and* then type check your code.
+type stubs require them! For these reasons, it is recommended that you should
+only use ``--install-types`` to generate a list of the known-available stub
+packages, which you should then copy to your project's dependencies to manage
+as normal. (Some people have been know to use ``--install-types --non-interactive``
+in CI, but this is not recommended.)
 
 If you've already installed the relevant third-party libraries in an environment
 other than the one mypy is running in, you can use :option:`--python-executable
@@ -456,6 +435,66 @@ this error, try:
     which is located at ``~/foo-project/src/foo/bar/baz.py``. In this case,
     you must run ``mypy ~/foo-project/src`` (or set the ``MYPYPATH`` to
     ``~/foo-project/src``).
+
+If somehow none of these work, you can suppress mypy's complaints: 
+
+1.  To suppress a *single* missing import error, add a ``# type: ignore`` at the end of the
+    line containing the import.
+
+2.  To suppress *all* missing import errors from a single library, add
+    a per-module section to your :ref:`mypy config file <config-file>` setting
+    :confval:`ignore_missing_imports` to True for that library. For example,
+    suppose your codebase
+    makes heavy use of a library named ``foobar``. You can silence
+    all import errors associated with that library and that library alone by
+    adding the following section to your config file:
+
+    .. tab:: mypy.ini
+
+        .. code-block:: ini
+
+            [mypy-foobar.*]
+            ignore_missing_imports = True
+
+    .. tab:: pyproject.toml
+
+        .. code-block:: toml
+
+            [[tool.mypy.overrides]]
+            module = ["foobar.*"]
+            ignore_missing_imports = true
+
+    Note: this option is equivalent to adding a ``# type: ignore`` to every
+    import of ``foobar`` in your codebase. For more information, see the
+    documentation about configuring
+    :ref:`import discovery <config-file-import-discovery>` in config files.
+    The ``.*`` after ``foobar`` will ignore imports of ``foobar`` modules
+    and subpackages in addition to the ``foobar`` top-level package namespace.
+
+3.  To suppress this message for *all* libraries
+    in your codebase, use :option:`--ignore-missing-imports <mypy --ignore-missing-imports>`.
+    See :ref:`code-missing-import` for more details on this error code.
+
+    You can also set :confval:`ignore_missing_imports`, like so:
+
+    .. tab:: mypy.ini
+
+        .. code-block:: ini
+
+            [mypy]
+            ignore-missing-imports
+
+    .. tab:: pyproject.toml
+
+        .. code-block:: ini
+
+            [tool.mypy]
+            ignore-missing-imports = true
+
+    We recommend avoiding this if possible: it's equivalent
+    to adding a ``# type: ignore`` to all unresolved imports in your codebase.
+
+
 
 .. _finding-imports:
 
