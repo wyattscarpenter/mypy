@@ -84,6 +84,9 @@ if TYPE_CHECKING:
         TypeVisitor as TypeVisitor,
     )
 
+TUPLE_NAMES: Final = ("builtins.tuple", "typing.Tuple")
+TYPE_NAMES: Final = ("builtins.type", "typing.Type")
+
 TYPE_VAR_LIKE_NAMES: Final = (
     "typing.TypeVar",
     "typing_extensions.TypeVar",
@@ -129,6 +132,12 @@ LITERAL_TYPE_NAMES: Final = ("typing.Literal", "typing_extensions.Literal")
 
 # Supported Annotated type names.
 ANNOTATED_TYPE_NAMES: Final = ("typing.Annotated", "typing_extensions.Annotated")
+
+# Supported Concatenate type names.
+CONCATENATE_TYPE_NAMES: Final = ("typing.Concatenate", "typing_extensions.Concatenate")
+
+# Supported Unpack type names.
+UNPACK_TYPE_NAMES: Final = ("typing.Unpack", "typing_extensions.Unpack")
 
 # Supported @deprecated type names
 DEPRECATED_TYPE_NAMES: Final = ("warnings.deprecated", "typing_extensions.deprecated")
@@ -451,6 +460,11 @@ class TypeGuardedType(Type):
 
     def __repr__(self) -> str:
         return f"TypeGuard({self.type_guard})"
+
+    # This may hide some real bugs, but it is convenient for various "synthetic"
+    # visitors, similar to RequiredType and ReadOnlyType below.
+    def accept(self, visitor: TypeVisitor[T]) -> T:
+        return self.type_guard.accept(visitor)
 
 
 class RequiredType(Type):
@@ -2204,7 +2218,7 @@ class CallableType(FunctionLike):
                     new_unpack = nested_unpacked.args[0]
                 else:
                     if not isinstance(nested_unpacked, TypeVarTupleType):
-                        # We found a non-nomralized tuple type, this means this method
+                        # We found a non-normalized tuple type, this means this method
                         # is called during semantic analysis (e.g. from get_proper_type())
                         # there is no point in normalizing callables at this stage.
                         return self
@@ -3205,12 +3219,12 @@ def get_proper_types(types: list[Type] | tuple[Type, ...]) -> list[ProperType]: 
 
 @overload
 def get_proper_types(
-    types: list[Type | None] | tuple[Type | None, ...]
+    types: list[Type | None] | tuple[Type | None, ...],
 ) -> list[ProperType | None]: ...
 
 
 def get_proper_types(
-    types: list[Type] | list[Type | None] | tuple[Type | None, ...]
+    types: list[Type] | list[Type | None] | tuple[Type | None, ...],
 ) -> list[ProperType] | list[ProperType | None]:
     if isinstance(types, list):
         typelist = types
@@ -3314,12 +3328,7 @@ class TypeStrVisitor(SyntheticTypeVisitor[str]):
         return s
 
     def visit_type_var(self, t: TypeVarType, /) -> str:
-        if t.name is None:
-            # Anonymous type variable type (only numeric id).
-            s = f"`{t.id}"
-        else:
-            # Named type variable type.
-            s = f"{t.name}`{t.id}"
+        s = f"{t.name}`{t.id}"
         if self.id_mapper and t.upper_bound:
             s += f"(upper_bound={t.upper_bound.accept(self)})"
         if t.has_default():
@@ -3331,12 +3340,7 @@ class TypeStrVisitor(SyntheticTypeVisitor[str]):
         s = ""
         if t.prefix.arg_types:
             s += f"[{self.list_str(t.prefix.arg_types)}, **"
-        if t.name is None:
-            # Anonymous type variable type (only numeric id).
-            s += f"`{t.id}"
-        else:
-            # Named type variable type.
-            s += f"{t.name_with_suffix()}`{t.id}"
+        s += f"{t.name_with_suffix()}`{t.id}"
         if t.prefix.arg_types:
             s += "]"
         if t.has_default():
@@ -3373,12 +3377,7 @@ class TypeStrVisitor(SyntheticTypeVisitor[str]):
         return f"[{s}]"
 
     def visit_type_var_tuple(self, t: TypeVarTupleType, /) -> str:
-        if t.name is None:
-            # Anonymous type variable type (only numeric id).
-            s = f"`{t.id}"
-        else:
-            # Named type variable type.
-            s = f"{t.name}`{t.id}"
+        s = f"{t.name}`{t.id}"
         if t.has_default():
             s += f" = {t.default.accept(self)}"
         return s
@@ -3498,8 +3497,9 @@ class TypeStrVisitor(SyntheticTypeVisitor[str]):
         return f"Literal[{t.value_repr()}]"
 
     def visit_union_type(self, t: UnionType, /) -> str:
-        s = self.list_str(t.items)
-        return f"Union[{s}]"
+        use_or_syntax = self.options.use_or_syntax()
+        s = self.list_str(t.items, use_or_syntax=use_or_syntax)
+        return s if use_or_syntax else f"Union[{s}]"
 
     def visit_partial_type(self, t: PartialType, /) -> str:
         if t.type is None:
@@ -3532,14 +3532,15 @@ class TypeStrVisitor(SyntheticTypeVisitor[str]):
     def visit_unpack_type(self, t: UnpackType, /) -> str:
         return f"Unpack[{t.type.accept(self)}]"
 
-    def list_str(self, a: Iterable[Type]) -> str:
+    def list_str(self, a: Iterable[Type], *, use_or_syntax: bool = False) -> str:
         """Convert items of an array to strings (pretty-print types)
         and join the results with commas.
         """
         res = []
         for t in a:
             res.append(t.accept(self))
-        return ", ".join(res)
+        sep = ", " if not use_or_syntax else " | "
+        return sep.join(res)
 
 
 class TrivialSyntheticTypeTranslator(TypeTranslator, SyntheticTypeVisitor[Type]):
@@ -3735,7 +3736,7 @@ def find_unpack_in_list(items: Sequence[Type]) -> int | None:
     return unpack_index
 
 
-def flatten_nested_tuples(types: Sequence[Type]) -> list[Type]:
+def flatten_nested_tuples(types: Iterable[Type]) -> list[Type]:
     """Recursively flatten TupleTypes nested with Unpack.
 
     For example this will transform
