@@ -2,6 +2,14 @@
 
 ## Next Release
 
+### `mypy: ignore`
+
+`mypy: ignore` comments are now honored by mypy exactly as though they said `type: ignore`.
+This allows one to suppress type errors from mypy in particular, without suppressing other type checkers,
+which can be desirable if mypy has a bug and other type checkers one runs on the same code do not.
+
+Contributed by Wyatt S Carpenter (PR [17875](https://github.com/python/mypy/pull/17875)).
+
 ## Mypy 1.16
 
 We’ve just uploaded mypy 1.16 to the Python Package Index ([PyPI](https://pypi.org/project/mypy/)).
@@ -617,14 +625,6 @@ Thanks to all mypy contributors who contributed to this release:
 - 정승원
 
 I’d also like to thank my employer, Dropbox, for supporting mypy development.
-
-### `mypy: ignore`
-
-`mypy: ignore` comments are now honored by mypy exactly as though they said `type: ignore`.
-This allows one to suppress type errors from mypy in particular, without suppressing other type checkers,
-which can be desirable if mypy has a bug and other type checkers one runs on the same code do not.
-
-Contributed by Wyatt S Carpenter (PR [17875](https://github.com/python/mypy/pull/17875)).
 
 ## Mypy 1.14
 
