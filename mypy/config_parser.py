@@ -323,13 +323,12 @@ def parse_config_file(
 
     If filename is None, fall back to default config files.
     """
-    stdout = stdout or sys.stdout
-    stderr = stderr or sys.stderr
+    stderr_param = stderr if stderr is not None else sys.stderr
 
     ret = (
-        _parse_individual_file(filename, stderr)
+        _parse_individual_file(filename, stderr_param)
         if filename is not None
-        else _find_config_file(stderr)
+        else _find_config_file(stderr_param)
     )
     if ret is None:
         return
@@ -340,12 +339,12 @@ def parse_config_file(
 
     if "mypy" not in parser:
         if filename or os.path.basename(file_read) not in defaults.SHARED_CONFIG_NAMES:
-            print(f"{file_read}: No [mypy] section in config file", file=stderr)
+            print(f"{file_read}: No [mypy] section in config file", file=stderr_param)
     else:
         section = parser["mypy"]
         prefix = f"{file_read}: [mypy]: "
         updates, report_dirs = parse_section(
-            prefix, options, set_strict_flags, section, config_types, stderr
+            prefix, options, set_strict_flags, section, config_types, stderr_param
         )
         for k, v in updates.items():
             setattr(options, k, v)
@@ -355,7 +354,7 @@ def parse_config_file(
         if name.startswith("mypy-"):
             prefix = get_prefix(file_read, name)
             updates, report_dirs = parse_section(
-                prefix, options, set_strict_flags, section, config_types, stderr
+                prefix, options, set_strict_flags, section, config_types, stderr_param
             )
             if report_dirs:
                 print(
@@ -363,7 +362,7 @@ def parse_config_file(
                     "Per-module sections should not specify reports ({})".format(
                         ", ".join(s + "_report" for s in sorted(report_dirs))
                     ),
-                    file=stderr,
+                    file=stderr_param,
                 )
             if set(updates) - PER_MODULE_OPTIONS:
                 print(
@@ -371,7 +370,7 @@ def parse_config_file(
                     "Per-module sections should only specify per-module flags ({})".format(
                         ", ".join(sorted(set(updates) - PER_MODULE_OPTIONS))
                     ),
-                    file=stderr,
+                    file=stderr_param,
                 )
                 updates = {k: v for k, v in updates.items() if k in PER_MODULE_OPTIONS}
 
@@ -389,7 +388,7 @@ def parse_config_file(
                         prefix,
                         "Patterns must be fully-qualified module names, optionally "
                         "with '*' in some components (e.g spam.*.eggs.*)",
-                        file=stderr,
+                        file=stderr_param,
                     )
                 else:
                     options.per_module_options[glob] = updates

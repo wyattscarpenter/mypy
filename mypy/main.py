@@ -1352,11 +1352,11 @@ def process_options(
 
     Returns a tuple of: a list of source files, an Options collected from flags.
     """
-    stdout = stdout if stdout is not None else sys.stdout
-    stderr = stderr if stderr is not None else sys.stderr
+    stdout_param = stdout if stdout is not None else sys.stdout
+    stderr_param = stderr if stderr is not None else sys.stderr
 
     parser, _, strict_flag_assignments = define_options(
-        program, header, stdout, stderr, server_options
+        program, header, stdout_param, stderr_param, server_options
     )
 
     # Parse arguments once into a dummy namespace so we can get the
@@ -1379,7 +1379,7 @@ def process_options(
             setattr(options, dest, value)
 
     # Parse config file first, so command line can override.
-    parse_config_file(options, set_strict_flags, config_file, stdout, stderr)
+    parse_config_file(options, set_strict_flags, config_file, stdout_param, stderr_param)
 
     # Set strict flags before parsing (if strict mode enabled), so other command
     # line options can override.
@@ -1521,18 +1521,18 @@ def process_options(
         cache = FindModuleCache(search_paths, fscache, options)
         for p in special_opts.packages:
             if os.sep in p or os.altsep and os.altsep in p:
-                fail(f"Package name '{p}' cannot have a slash in it.", stderr, options)
+                fail(f"Package name '{p}' cannot have a slash in it.", stderr_param, options)
             p_targets = cache.find_modules_recursive(p)
             if not p_targets:
                 reason = cache.find_module(p)
                 if reason is ModuleNotFoundReason.FOUND_WITHOUT_TYPE_HINTS:
                     fail(
                         f"Package '{p}' cannot be type checked due to missing py.typed marker. See https://mypy.readthedocs.io/en/stable/installed_packages.html for more details",
-                        stderr,
+                        stderr_param,
                         options,
                     )
                 else:
-                    fail(f"Can't find package '{p}'", stderr, options)
+                    fail(f"Can't find package '{p}'", stderr_param, options)
             targets.extend(p_targets)
         for m in special_opts.modules:
             targets.append(BuildSource(None, m, None))
@@ -1546,7 +1546,7 @@ def process_options(
         # which causes issues when using the same variable to catch
         # exceptions of different types.
         except InvalidSourceList as e2:
-            fail(str(e2), stderr, options)
+            fail(str(e2), stderr_param, options)
     return targets, options
 
 

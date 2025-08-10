@@ -183,13 +183,13 @@ def build(
         messages.extend(new_messages)
 
     flush_errors = flush_errors or default_flush_errors
-    stdout = stdout or sys.stdout
-    stderr = stderr or sys.stderr
+    stdout_param = stdout if stdout is not None else sys.stdout
+    stderr_param = stderr if stderr is not None else sys.stderr
     extra_plugins = extra_plugins or []
 
     try:
         result = _build(
-            sources, options, alt_lib_path, flush_errors, fscache, stdout, stderr, extra_plugins
+            sources, options, alt_lib_path, flush_errors, fscache, stdout_param, stderr_param, extra_plugins
         )
         result.errors = messages
         return result
