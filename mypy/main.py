@@ -11,7 +11,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from gettext import gettext
 from io import TextIOWrapper
-from typing import IO, TYPE_CHECKING, Any, Final, NoReturn, TextIO
+from typing import IO, TYPE_CHECKING, Final, NoReturn, TextIO
 
 from mypy import build, defaults, state, util
 from mypy.config_parser import (
@@ -249,7 +249,7 @@ def show_messages(
 
 # Make the help output a little less jarring.
 class AugmentedHelpFormatter(argparse.RawDescriptionHelpFormatter):
-    def __init__(self, prog: str, **kwargs: Any) -> None:
+    def __init__(self, prog: str, **kwargs: object) -> None:
         super().__init__(prog=prog, max_help_position=28, **kwargs)
 
     def _fill_text(self, text: str, width: int, indent: str) -> str:
@@ -377,7 +377,7 @@ class CapturableArgumentParser(argparse.ArgumentParser):
     yet output must be captured to properly support mypy.api.run.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: object, **kwargs: object) -> None:
         self.stdout = kwargs.pop("stdout", sys.stdout)
         self.stderr = kwargs.pop("stderr", sys.stderr)
         super().__init__(*args, **kwargs)
@@ -453,7 +453,7 @@ class CapturableVersionAction(argparse.Action):
         self,
         parser: argparse.ArgumentParser,
         namespace: argparse.Namespace,
-        values: str | Sequence[Any] | None,
+        values: str | Sequence[object] | None,
         option_string: str | None = None,
     ) -> NoReturn:
         formatter = parser._get_formatter()
