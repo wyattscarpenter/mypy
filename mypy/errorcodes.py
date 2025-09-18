@@ -20,11 +20,13 @@ class ErrorCode:
         self,
         code: str,
         description: str,
+        category: str = "General",
         default_enabled: bool = True,
         sub_code_of: ErrorCode | None = None,
     ) -> None:
         self.code = code
         self.description = description
+        self.category = category
         self.default_enabled = default_enabled
         self.sub_code_of = sub_code_of
         if sub_code_of is not None:
@@ -37,7 +39,7 @@ class ErrorCode:
 
     def __repr__(self) -> str:
         """This doesn't fulfill the goals of repr but it's better than the default view."""
-        return f"<ErrorCode {self.code}>"
+        return f"<ErrorCode {self.category}: {self.code}>"
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ErrorCode):
