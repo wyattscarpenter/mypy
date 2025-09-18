@@ -50,9 +50,7 @@ class ErrorCode:
 
 ATTR_DEFINED: Final = ErrorCode("attr-defined", "Check that attribute exists")
 NAME_DEFINED: Final = ErrorCode("name-defined", "Check that name is defined")
-CALL_ARG: Final = ErrorCode(
-    "call-arg", "Check number, names and kinds of arguments in calls"
-)
+CALL_ARG: Final = ErrorCode("call-arg", "Check number, names and kinds of arguments in calls")
 ARG_TYPE: Final = ErrorCode("arg-type", "Check argument types in calls")
 CALL_OVERLOAD: Final = ErrorCode(
     "call-overload", "Check that an overload variant matches arguments"
@@ -61,48 +59,32 @@ VALID_TYPE: Final = ErrorCode("valid-type", "Check that type (annotation) is val
 VAR_ANNOTATED: Final = ErrorCode(
     "var-annotated", "Require variable annotation if type can't be inferred"
 )
-OVERRIDE: Final = ErrorCode(
-    "override", "Check that method override is compatible with base class"
-)
+OVERRIDE: Final = ErrorCode("override", "Check that method override is compatible with base class")
 RETURN: Final = ErrorCode("return", "Check that function always returns a value")
 RETURN_VALUE: Final = ErrorCode(
     "return-value", "Check that return value is compatible with signature"
 )
-ASSIGNMENT: Final = ErrorCode(
-    "assignment", "Check that assigned value is compatible with target"
-)
+ASSIGNMENT: Final = ErrorCode("assignment", "Check that assigned value is compatible with target")
 METHOD_ASSIGN: Final = ErrorCode(
-    "method-assign",
-    "Check that assignment target is not a method",
-    sub_code_of=ASSIGNMENT,
+    "method-assign", "Check that assignment target is not a method", sub_code_of=ASSIGNMENT
 )
 TYPE_ARG: Final = ErrorCode("type-arg", "Check that generic type arguments are present")
 TYPE_VAR: Final = ErrorCode("type-var", "Check that type variable values are valid")
-UNION_ATTR: Final = ErrorCode(
-    "union-attr", "Check that attribute exists in each item of a union"
-)
+UNION_ATTR: Final = ErrorCode("union-attr", "Check that attribute exists in each item of a union")
 INDEX: Final = ErrorCode("index", "Check indexing operations")
 OPERATOR: Final = ErrorCode("operator", "Check that operator is valid for operands")
-LIST_ITEM: Final = ErrorCode(
-    "list-item", "Check list items in a list expression [item, ...]"
-)
+LIST_ITEM: Final = ErrorCode("list-item", "Check list items in a list expression [item, ...]")
 DICT_ITEM: Final = ErrorCode(
     "dict-item", "Check dict items in a dict expression {key: value, ...}"
 )
-TYPEDDICT_ITEM: Final = ErrorCode(
-    "typeddict-item", "Check items when constructing TypedDict"
-)
+TYPEDDICT_ITEM: Final = ErrorCode("typeddict-item", "Check items when constructing TypedDict")
 TYPEDDICT_UNKNOWN_KEY: Final = ErrorCode(
     "typeddict-unknown-key",
     "Check unknown keys when constructing TypedDict",
     sub_code_of=TYPEDDICT_ITEM,
 )
-HAS_TYPE: Final = ErrorCode(
-    "has-type", "Check that type of reference can be determined"
-)
-IMPORT: Final = ErrorCode(
-    "import", "Require that imported module can be found or has stubs"
-)
+HAS_TYPE: Final = ErrorCode("has-type", "Check that type of reference can be determined")
+IMPORT: Final = ErrorCode("import", "Require that imported module can be found or has stubs")
 IMPORT_NOT_FOUND: Final = ErrorCode(
     "import-not-found", "Require that imported module can be found", sub_code_of=IMPORT
 )
@@ -119,46 +101,33 @@ ABSTRACT: Final = ErrorCode(
 TYPE_ABSTRACT: Final = ErrorCode(
     "type-abstract", "Require only concrete classes where Type[...] is expected"
 )
-VALID_NEWTYPE: Final = ErrorCode(
-    "valid-newtype", "Check that argument 2 to NewType is valid"
-)
+VALID_NEWTYPE: Final = ErrorCode("valid-newtype", "Check that argument 2 to NewType is valid")
 STRING_FORMATTING: Final = ErrorCode(
     "str-format", "Check that string formatting/interpolation is type-safe"
 )
 STR_BYTES_PY3: Final = ErrorCode(
     "str-bytes-safe", "Warn about implicit coercions related to bytes and string types"
 )
-EXIT_RETURN: Final = ErrorCode(
-    "exit-return", "Warn about too general return type for '__exit__'"
-)
+EXIT_RETURN: Final = ErrorCode("exit-return", "Warn about too general return type for '__exit__'")
 LITERAL_REQ: Final = ErrorCode("literal-required", "Check that value is a literal")
-UNUSED_COROUTINE: Final = ErrorCode(
-    "unused-coroutine", "Ensure that all coroutines are used"
-)
+UNUSED_COROUTINE: Final = ErrorCode("unused-coroutine", "Ensure that all coroutines are used")
 EMPTY_BODY: Final = ErrorCode(
-    "empty-body",
-    "A dedicated error code to opt out return errors for empty/trivial bodies",
+    "empty-body", "A dedicated error code to opt out return errors for empty/trivial bodies"
 )
 SAFE_SUPER: Final = ErrorCode(
     "safe-super", "Warn about calls to abstract methods with empty/trivial bodies"
 )
-TOP_LEVEL_AWAIT: Final = ErrorCode(
-    "top-level-await", "Warn about top level await expressions"
-)
+TOP_LEVEL_AWAIT: Final = ErrorCode("top-level-await", "Warn about top level await expressions")
 AWAIT_NOT_ASYNC: Final = ErrorCode(
     "await-not-async", 'Warn about "await" outside coroutine ("async def")'
 )
 # These error codes aren't enabled by default.
-NO_UNTYPED_DEF: Final = ErrorCode(
-    "no-untyped-def", "Check that every function has an annotation"
-)
+NO_UNTYPED_DEF: Final = ErrorCode("no-untyped-def", "Check that every function has an annotation")
 NO_UNTYPED_CALL: Final = ErrorCode(
     "no-untyped-call",
     "Disallow calling functions without type annotations from annotated functions",
 )
-REDUNDANT_CAST: Final = ErrorCode(
-    "redundant-cast", "Check that cast changes type of expression"
-)
+REDUNDANT_CAST: Final = ErrorCode("redundant-cast", "Check that cast changes type of expression")
 ASSERT_TYPE: Final = ErrorCode("assert-type", "Check that assert_type() call succeeds")
 COMPARISON_OVERLAP: Final = ErrorCode(
     "comparison-overlap", "Check that types in comparisons and 'in' expressions overlap"
@@ -167,12 +136,9 @@ NO_ANY_UNIMPORTED: Final = ErrorCode(
     "no-any-unimported", 'Reject "Any" types from unfollowed imports'
 )
 NO_ANY_RETURN: Final = ErrorCode(
-    "no-any-return",
-    'Reject returning value with "Any" type if return type is not "Any"',
+    "no-any-return", 'Reject returning value with "Any" type if return type is not "Any"'
 )
-UNREACHABLE: Final = ErrorCode(
-    "unreachable", "Warn about unreachable statements or expressions"
-)
+UNREACHABLE: Final = ErrorCode("unreachable", "Warn about unreachable statements or expressions")
 ANNOTATION_UNCHECKED: Final = ErrorCode(
     "annotation-unchecked", "Notify about type annotations in unchecked functions"
 )
@@ -193,20 +159,16 @@ TRUTHY_BOOL: Final = ErrorCode(
     default_enabled=False,
 )
 TRUTHY_FUNCTION: Final = ErrorCode(
-    "truthy-function",
-    "Warn about function that always evaluate to true in boolean contexts",
+    "truthy-function", "Warn about function that always evaluate to true in boolean contexts"
 )
 TRUTHY_ITERABLE: Final = ErrorCode(
     "truthy-iterable",
     "Warn about Iterable expressions that could always evaluate to true in boolean contexts",
     default_enabled=False,
 )
-NAME_MATCH: Final = ErrorCode(
-    "name-match", "Check that type definition has consistent naming"
-)
+NAME_MATCH: Final = ErrorCode("name-match", "Check that type definition has consistent naming")
 NO_OVERLOAD_IMPL: Final = ErrorCode(
-    "no-overload-impl",
-    "Check that overloaded functions outside stub files have an implementation",
+    "no-overload-impl", "Check that overloaded functions outside stub files have an implementation"
 )
 IGNORE_WITHOUT_CODE: Final = ErrorCode(
     "ignore-without-code",
@@ -214,9 +176,7 @@ IGNORE_WITHOUT_CODE: Final = ErrorCode(
     default_enabled=False,
 )
 UNUSED_AWAITABLE: Final = ErrorCode(
-    "unused-awaitable",
-    "Ensure that all awaitable values are used",
-    default_enabled=False,
+    "unused-awaitable", "Ensure that all awaitable values are used", default_enabled=False
 )
 REDUNDANT_SELF_TYPE: Final = ErrorCode(
     "redundant-self",
@@ -240,14 +200,10 @@ UNIMPORTED_REVEAL: Final = ErrorCode(
     default_enabled=False,
 )
 MUTABLE_OVERRIDE: Final = ErrorCode(
-    "mutable-override",
-    "Reject covariant overrides for mutable attributes",
-    default_enabled=False,
+    "mutable-override", "Reject covariant overrides for mutable attributes", default_enabled=False
 )
 EXHAUSTIVE_MATCH: Final = ErrorCode(
-    "exhaustive-match",
-    "Reject match statements that are not exhaustive",
-    default_enabled=False,
+    "exhaustive-match", "Reject match statements that are not exhaustive", default_enabled=False
 )
 METACLASS: Final = ErrorCode("metaclass", "Ensure that metaclass is valid")
 
@@ -275,9 +231,7 @@ OVERLOAD_OVERLAP: Final = ErrorCode(
 )
 
 PROPERTY_DECORATOR: Final = ErrorCode(
-    "prop-decorator",
-    "Decorators on top of @property are not supported",
-    sub_code_of=MISC,
+    "prop-decorator", "Decorators on top of @property are not supported", sub_code_of=MISC
 )
 
 NARROWED_TYPE_NOT_SUBTYPE: Final = ErrorCode(
@@ -285,9 +239,7 @@ NARROWED_TYPE_NOT_SUBTYPE: Final = ErrorCode(
     "Warn if a TypeIs function's narrowed type is not a subtype of the original type",
 )
 
-EXPLICIT_ANY: Final = ErrorCode(
-    "explicit-any", "Warn about explicit Any type annotations"
-)
+EXPLICIT_ANY: Final = ErrorCode("explicit-any", "Warn about explicit Any type annotations")
 
 DEPRECATED: Final = ErrorCode(
     "deprecated",
