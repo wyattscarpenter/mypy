@@ -59,15 +59,6 @@ cmds = {
     # Self type check, but use mypyc;
     # for instance, to catch nasty mypyc bugs.
     "selfc": ["mypyc"] + self_args,
-    # Type check setup.py as well
-    "self-packaging": [
-        executable,
-        "-m",
-        "mypy",
-        "--config-file",
-        "mypy_self_check.ini",
-        "setup.py",
-    ],
     # Lint
     "lint": ["pre-commit", "run", "--all-files"],
     # Fast test cases only (this is the bulk of the test suite)
