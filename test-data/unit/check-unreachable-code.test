@@ -737,6 +737,40 @@ assert sys.platform == 'lol'
 reveal_type('')  # No error here :-)
 [builtins fixtures/ops.pyi]
 
+[case testUnreachableAfterToplevelAssertFlaggy]
+# flags: --python-version=3.9 --show-error-codes
+# This test may false negative succeed if you are actually running python 3.9
+import sys
+reveal_type(0)  # N: Revealed type is "Literal[0]?"
+x: int | tuple[int]  # E: X | Y syntax for unions requires Python 3.10  [syntax]
+"a"+1  # E: Unsupported operand types for + ("str" and "int")  [operator]
+assert sys.version_info > (3,9)
+match point:
+    case (0, 0):
+        print("Origin")
+    case _:
+        raise ValueError("Not a point")
+reveal_type('')  # No error here :-)
+x: int | tuple[int] # a little 3.10 syntax to check
+[builtins fixtures/ops.pyi]
+
+[case testUnreachableAfterToplevelAssertConfigy]
+# This test may false negative succeed if you are act>
+# flags: --config-file=tmp/foo.ini --show-error-codes
+import sys
+reveal_type(0)  # N: Revealed type is "Literal[0]?"
+x: int | tuple[int]  # E: X | Y syntax for unions requires Python 3.10  [syntax]
+"a"+1  # E: Unsupported operand types for + ("str" and "int")  [operator]
+assert sys.version_info > (3,9)
+reveal_type('')  # No error here :-)
+x: int | tuple[int] # a little 3.10 syntax to check
+
+[file foo.ini]
+\[mypy]
+python_version=3.9
+
+[builtins fixtures/ops.pyi]
+
 [case testUnreachableAfterToplevelAssert2]
 import sys
 reveal_type(0)  # N: Revealed type is "Literal[0]?"
