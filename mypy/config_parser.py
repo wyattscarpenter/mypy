@@ -591,12 +591,6 @@ def parse_section(
             continue
         results[options_key] = v
 
-    # These two flags act as per-module overrides, so store the empty defaults.
-    if "disable_error_code" not in results:
-        results["disable_error_code"] = []
-    if "enable_error_code" not in results:
-        results["enable_error_code"] = []
-
     return results, report_dirs
 
 
@@ -668,7 +662,7 @@ def parse_mypy_comments(
     generated.
     """
     errors: list[tuple[int, str]] = []
-    sections: dict[str, object] = {"enable_error_code": [], "disable_error_code": []}
+    sections = {}
 
     for lineno, line in args:
         # In order to easily match the behavior for bools, we abuse configparser.
@@ -705,23 +699,6 @@ def parse_mypy_comments(
                     '(see "mypy -h" for the list of flags enabled in strict mode)',
                 )
             )
-        # Because this is currently special-cased
-        # (the new_sections for an inline config *always* includes 'disable_error_code' and
-        # 'enable_error_code' fields, usually empty, which overwrite the old ones),
-        # we have to manipulate them specially.
-        # This could use a refactor, but so could the whole subsystem.
-        if (
-            "enable_error_code" in new_sections
-            and isinstance(neec := new_sections["enable_error_code"], list)
-            and isinstance(eec := sections.get("enable_error_code", []), list)
-        ):
-            new_sections["enable_error_code"] = sorted(set(neec + eec))
-        if (
-            "disable_error_code" in new_sections
-            and isinstance(ndec := new_sections["disable_error_code"], list)
-            and isinstance(dec := sections.get("disable_error_code", []), list)
-        ):
-            new_sections["disable_error_code"] = sorted(set(ndec + dec))
         sections.update(new_sections)
     return sections, errors
 
