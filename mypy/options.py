@@ -40,6 +40,7 @@ PER_MODULE_OPTIONS: Final = {
     "disallow_untyped_calls",
     "disallow_untyped_decorators",
     "disallow_untyped_defs",
+    "enable_all_error_codes",
     "enable_error_code",
     "enabled_error_codes",
     "extra_checks",
