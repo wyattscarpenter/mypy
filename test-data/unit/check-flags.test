@@ -6,6 +6,11 @@ main:2: error: Function is missing a type annotation
 
 [case testDisableIgnores]
 # flags: --disable-ignores
+# type: ignore # a type ignore before everything usually ignores the entire file. But not now!
+a  # E: Name "a" is not defined
+a  #type: ignore  # E: Name "a" is not defined
+a  #type: ignore[golly]  # E: Name "a" is not defined
+a  #type: ignore[name-defined]  # E: Name "a" is not defined
 
 [case testUnannotatedArgument]
 # flags: --disallow-untyped-defs
