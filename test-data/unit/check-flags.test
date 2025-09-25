@@ -4,6 +4,9 @@ def f(x): pass
 [out]
 main:2: error: Function is missing a type annotation
 
+[case testDisableIgnores]
+# flags: --disable-ignores
+
 [case testUnannotatedArgument]
 # flags: --disallow-untyped-defs
 def f(x) -> int: pass
