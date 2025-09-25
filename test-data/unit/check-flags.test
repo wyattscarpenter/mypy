@@ -1,3 +1,18 @@
+[case testDisabledErrorCodes]
+# flags: --disabled-error-codes=name-defined
+A
+[case testDisabledErrorCodesConfig]
+# flags: --config tmp/n.ini
+A  # E: Name "A" is not defined
+[file n.ini]
+\[mypy]
+disabled_error_codes=name-defined
+[case testDisabledErrorCodesInline]
+#mypy: disabled_error_codes=name-defined
+A # this is fine now  # E: Name "A" is not defined
+[case testDisabledErrorCodesPerModule-xfail]
+# Didn't want to write this one yet
+
 [case testUnannotatedFunction]
 # flags: --disallow-untyped-defs
 def f(x): pass
