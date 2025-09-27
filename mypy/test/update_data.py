@@ -62,7 +62,11 @@ def _iter_fixes(
             continue  # other sections we don't touch
 
         fix_lines = []
-        accounting_error = 0
+        accounting_error = 0 # The problem that necessitates tracking accounting error
+        # is probably how parse_test_data collapses line continuations. Eventually,
+        # that code is going to have to be rearchitected so that we stop having this
+        # broad class of problems (having to annoyingly un-interpret the test case
+        # when we print it back out).
         for lineno, source_line in enumerate(source_lines, start=1):
             reports_on_this_line = reports_by_line.get((file_path, lineno))
             comment_match = re.search(r"(?P<indent>\s+)(?P<comment># [EWN]: .+)$", source_line)
