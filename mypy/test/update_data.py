@@ -34,7 +34,7 @@ def _iter_fixes(
             msg = comment_match.group("msg")
             reports_by_line[filename, lineno].append((severity, msg))
 
-    test_items = parse_test_data(testcase.data, testcase.name)
+    test_items = parse_test_data(testcase.data, testcase.name, collapse_line_continuations=True)
 
     # If we have [out] and/or [outN], we update just those sections.
     if any(re.match(r"^out\d*$", test_item.id) for test_item in test_items):
@@ -71,7 +71,9 @@ def _iter_fixes(
             reports_on_this_line = reports_by_line.get((file_path, lineno))
             comment_match = re.search(r"(?P<indent>\s+)(?P<comment># [EWN]: .+)$", source_line)
             if comment_match:
+                print(source_line)
                 source_line = source_line[: comment_match.start("indent")]  # strip old comment
+                print(source_line)
             if reports_on_this_line:
                 indent = comment_match.group("indent") if comment_match else "  "
                 # Multiple info reports for the same line are represented in these
@@ -83,8 +85,8 @@ def _iter_fixes(
                     is_last = (i == len(reports_on_this_line) - 1)
                     severity_char = severity[0].upper()
                     continuation = "" if is_last else " \\"
-                    if is_last:
-                        accounting_error += 1
+                    if not is_last:
+                        pass#accounting_error += 1
                     fix_lines.append(f"{out_l}{indent}# {severity_char}: {msg}{continuation}")
             else:
                 fix_lines.append(source_line)

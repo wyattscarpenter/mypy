@@ -444,7 +444,7 @@ class TestItem:
         return self.end_line - self.line - len(self.data)
 
 
-def parse_test_data(raw_data: str, name: str) -> list[TestItem]:
+def parse_test_data(raw_data: str, name: str, collapse_line_continuations=True) -> list[TestItem]:
     """Parse a list of lines that represent a sequence of test items."""
 
     lines = ["", "[case " + name + "]"] + raw_data.split("\n")
@@ -461,8 +461,8 @@ def parse_test_data(raw_data: str, name: str) -> list[TestItem]:
 
         if lines[i].startswith("[") and s.endswith("]"):
             if id:
-                data = collapse_line_continuation(data)
                 data = strip_list(data)
+                data, count_of_removed_continuations = collapse_line_continuation(data)
                 ret.append(TestItem(id, arg, data, i0 + 1, i))
 
             i0 = i
@@ -482,8 +482,8 @@ def parse_test_data(raw_data: str, name: str) -> list[TestItem]:
 
     # Process the last item.
     if id:
-        data = collapse_line_continuation(data)
         data = strip_list(data)
+        data, count_of_removed_continuations = collapse_line_continuation(data)
         ret.append(TestItem(id, arg, data, i0 + 1, i - 1))
 
     return ret
@@ -507,8 +507,9 @@ def strip_list(l: list[str]) -> list[str]:
     return r
 
 
-def collapse_line_continuation(l: list[str]) -> list[str]:
+def collapse_line_continuation(l: list[str]) -> tuple[list[str], int]:
     r: list[str] = []
+    print("l", l)
     cont = False
     for s in l:
         ss = re.sub(r"\\$", "", s)
@@ -517,7 +518,9 @@ def collapse_line_continuation(l: list[str]) -> list[str]:
         else:
             r.append(ss)
         cont = s.endswith("\\")
-    return r
+    print("HI", len(l)-len(r))
+    print("r", r)
+    return r, len(l)-len(r)
 
 
 def expand_variables(s: str) -> str:
