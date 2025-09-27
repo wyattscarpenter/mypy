@@ -60,6 +60,16 @@ class UpdateDataSuite(Suite):
             [out]
             main:1: error: Incompatible types in assignment (expression has type "int", variable has type "str")
 
+            [case testOutWithMuchTraillingWhitespace]
+            s: str = 42
+            [out]
+            main:1: error: Incompatible types in assignment (expression has type "int", variable has type "str")
+
+
+
+
+
+
             [case testOutWrong]
             s: str = 42
             [out]
@@ -121,6 +131,16 @@ class UpdateDataSuite(Suite):
         s: str = 42
         [out]
         main:1: error: Incompatible types in assignment (expression has type "int", variable has type "str")
+
+        [case testOutWithMuchTraillingWhitespace]
+        s: str = 42
+        [out]
+        main:1: error: Incompatible types in assignment (expression has type "int", variable has type "str")
+
+
+
+
+
 
         [case testOutWrong]
         s: str = 42

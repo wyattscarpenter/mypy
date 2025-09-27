@@ -439,15 +439,13 @@ class TestItem:
     # End line: 1-based, exclusive, relative to testcase; not same as `line + len(test_item.data)` due to collapsing
     end_line: int
 
-    @property
-    def trimmed_newlines(self) -> int:  # compensates for strip_list
-        return self.end_line - self.line - len(self.data)
-
-
-def parse_test_data(raw_data: str, name: str, collapse_line_continuations=True) -> list[TestItem]:
-    """Parse a list of lines that represent a sequence of test items."""
-
+def parse_test_data(raw_data: str, name: str) -> list[TestItem]:
+    """Parse a multi-line text that represents a sequence of test items."""
+    print("RAW_DATA", raw_data)
+    raw_data = re.sub(r"\\\n", "", raw_data)
+    print("RAW_DATA2", raw_data)
     lines = ["", "[case " + name + "]"] + raw_data.split("\n")
+    print("LINES", lines)
     ret: list[TestItem] = []
     data: list[str] = []
 
@@ -461,8 +459,6 @@ def parse_test_data(raw_data: str, name: str, collapse_line_continuations=True) 
 
         if lines[i].startswith("[") and s.endswith("]"):
             if id:
-                data = strip_list(data)
-                data, count_of_removed_continuations = collapse_line_continuation(data)
                 ret.append(TestItem(id, arg, data, i0 + 1, i))
 
             i0 = i
@@ -474,53 +470,20 @@ def parse_test_data(raw_data: str, name: str, collapse_line_continuations=True) 
             data = []
         elif lines[i].startswith("\\["):
             data.append(lines[i][1:])
-        elif not lines[i].startswith("--"):
+        elif lines[i].startswith("--"):
+            if lines[i].startswith("----"):
+                data.append(lines[i][2:])
+            else:
+                pass
+        else:
             data.append(lines[i])
-        elif lines[i].startswith("----"):
-            data.append(lines[i][2:])
         i += 1
 
     # Process the last item.
     if id:
-        data = strip_list(data)
-        data, count_of_removed_continuations = collapse_line_continuation(data)
         ret.append(TestItem(id, arg, data, i0 + 1, i - 1))
 
     return ret
-
-
-def strip_list(l: list[str]) -> list[str]:
-    """Return a stripped copy of l.
-
-    Strip whitespace at the end of all lines, and strip all empty
-    lines from the end of the array.
-    """
-
-    r: list[str] = []
-    for s in l:
-        # Strip spaces at end of line
-        r.append(re.sub(r"\s+$", "", s))
-
-    while r and r[-1] == "":
-        r.pop()
-
-    return r
-
-
-def collapse_line_continuation(l: list[str]) -> tuple[list[str], int]:
-    r: list[str] = []
-    print("l", l)
-    cont = False
-    for s in l:
-        ss = re.sub(r"\\$", "", s)
-        if cont:
-            r[-1] += re.sub("^ +", "", ss)
-        else:
-            r.append(ss)
-        cont = s.endswith("\\")
-    print("HI", len(l)-len(r))
-    print("r", r)
-    return r, len(l)-len(r)
 
 
 def expand_variables(s: str) -> str:

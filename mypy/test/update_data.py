@@ -34,7 +34,7 @@ def _iter_fixes(
             msg = comment_match.group("msg")
             reports_by_line[filename, lineno].append((severity, msg))
 
-    test_items = parse_test_data(testcase.data, testcase.name, collapse_line_continuations=True)
+    test_items = parse_test_data(testcase.data, testcase.name)
 
     # If we have [out] and/or [outN], we update just those sections.
     if any(re.match(r"^out\d*$", test_item.id) for test_item in test_items):
@@ -45,7 +45,7 @@ def _iter_fixes(
                 yield DataFileFix(
                     lineno=testcase.line + test_item.line - 1,
                     end_lineno=testcase.line + test_item.end_line - 1,
-                    lines=actual + [""] * test_item.trimmed_newlines,
+                    lines=actual + [""],
                 )
 
         return
@@ -62,11 +62,6 @@ def _iter_fixes(
             continue  # other sections we don't touch
 
         fix_lines = []
-        accounting_error = 0 # The problem that necessitates tracking accounting error
-        # is probably how parse_test_data collapses line continuations. Eventually,
-        # that code is going to have to be rearchitected so that we stop having this
-        # broad class of problems (having to annoyingly un-interpret the test case
-        # when we print it back out).
         for lineno, source_line in enumerate(source_lines, start=1):
             reports_on_this_line = reports_by_line.get((file_path, lineno))
             comment_match = re.search(r"(?P<indent>\s+)(?P<comment># [EWN]: .+)$", source_line)
@@ -85,8 +80,6 @@ def _iter_fixes(
                     is_last = (i == len(reports_on_this_line) - 1)
                     severity_char = severity[0].upper()
                     continuation = "" if is_last else " \\"
-                    if not is_last:
-                        pass#accounting_error += 1
                     fix_lines.append(f"{out_l}{indent}# {severity_char}: {msg}{continuation}")
             else:
                 fix_lines.append(source_line)
@@ -94,5 +87,5 @@ def _iter_fixes(
         yield DataFileFix(
             lineno=testcase.line + test_item.line - 1,
             end_lineno=testcase.line + test_item.end_line - 1,
-            lines=fix_lines + [""] * (test_item.trimmed_newlines - accounting_error),
+            lines=fix_lines,
         )
