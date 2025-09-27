@@ -65,8 +65,10 @@ def _iter_fixes(
         for lineno, source_line in enumerate(source_lines, start=1):
             reports = reports_by_line.get((file_path, lineno))
             comment_match = re.search(r"(?P<indent>\s+)(?P<comment># [EWN]: .+)$", source_line)
+            accounting_penalty = 0
             if comment_match:
                 source_line = source_line[: comment_match.start("indent")]  # strip old comment
+                accounting_penalty += 1
             if reports:
                 indent = comment_match.group("indent") if comment_match else "  "
                 # multiline comments are on the first line and then on subsequent lines empty lines
@@ -77,11 +79,13 @@ def _iter_fixes(
                     severity_char = severity[0].upper()
                     continuation = "" if is_last else " \\"
                     fix_lines.append(f"{out_l}{indent}# {severity_char}: {msg}{continuation}")
+                    if is_last:
+                        accounting_penalty -= 1
             else:
                 fix_lines.append(source_line)
 
         yield DataFileFix(
             lineno=testcase.line + test_item.line - 1,
             end_lineno=testcase.line + test_item.end_line - 1,
-            lines=fix_lines + [""] * test_item.trimmed_newlines,
+            lines=fix_lines + [""] * (test_item.trimmed_newlines - accounting_penalty),
         )

@@ -49,6 +49,10 @@ class UpdateDataSuite(Suite):
             s: str = 'foo'  # W: foo \
                             # N: bar
 
+            [case testIndentationOfMultiline]
+            s: str = 42  #type: ignore[hmm]  # E: Incompatible types in assignment (expression has type "int", variable has type "str")\
+                  # N: Error code "assignment" not covered by "type: ignore" comment
+
             [case testOutCorrect]
             s: str = 42
             [out]
@@ -104,6 +108,10 @@ class UpdateDataSuite(Suite):
 
         [case testExtraneousMultilineNonError]
         s: str = 'foo'
+
+        [case testIndentationOfMultiline]
+        s: str = 42  #type: ignore[hmm]  # E: Incompatible types in assignment (expression has type "int", variable has type "str") \
+                                         # N: Error code "assignment" not covered by "type: ignore" comment
 
         [case testOutCorrect]
         s: str = 42
