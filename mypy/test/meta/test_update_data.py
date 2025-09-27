@@ -50,8 +50,10 @@ class UpdateDataSuite(Suite):
                             # N: bar
 
             [case testIndentationOfMultiline]
-            s: str = 42  #type: ignore[hmm]  # E: Incompatible types in assignment (expression has type "int", variable has type "str")\
-                  # N: Error code "assignment" not covered by "type: ignore" comment
+            s: str = 42;  i: int = 'foo' # E: Incompatible types in assignment (expression has type "int", variable has type "str")\
+                # E: Incompatible types in assignment (expression has type "int", variable has type "str")
+            s2: str = 42;  i2: int = 'foo' # E: Incompatible types in assignment (expression has type "int", variable has type "str")\
+                # E: Incompatible types in assignment (expression has type "int", variable has type "str")
 
             [case testOutCorrect]
             s: str = 42
@@ -110,8 +112,10 @@ class UpdateDataSuite(Suite):
         s: str = 'foo'
 
         [case testIndentationOfMultiline]
-        s: str = 42  #type: ignore[hmm]  # E: Incompatible types in assignment (expression has type "int", variable has type "str") \
-                                         # N: Error code "assignment" not covered by "type: ignore" comment
+        s: str = 42;  i: int = 'foo' # E: Incompatible types in assignment (expression has type "int", variable has type "str") \
+                                     # E: Incompatible types in assignment (expression has type "str", variable has type "int")
+        s2: str = 42;  i2: int = 'foo' # E: Incompatible types in assignment (expression has type "int", variable has type "str") \
+                                       # E: Incompatible types in assignment (expression has type "str", variable has type "int")
 
         [case testOutCorrect]
         s: str = 42
