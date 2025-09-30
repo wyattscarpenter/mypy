@@ -9,7 +9,7 @@ A  # E: Name "A" is not defined
 disabled_error_codes=name-defined
 [case testDisabledErrorCodesInline]
 #mypy: disabled_error_codes=name-defined
-A # this is fine now  # E: Name "A" is not defined
+A # E: Name "A" is not defined
 [case testDisabledErrorCodesPerModule-xfail]
 # Didn't want to write this one yet
 
