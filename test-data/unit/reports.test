@@ -552,5 +552,5 @@ namespace_packages = True
 # cmd: mypy --cobertura-xml-report report -p folder
 --Regression test for https://github.com/python/mypy/issues/19843
 [file folder/subfolder/something.py]
-class Something:
-    pass
+[out]
+--[outfile report/cobertura.xml]
