@@ -513,6 +513,8 @@ class Options:
         # Similar to global codes enabling overrides disabling, so we start from latter.
         new_options.disabled_error_codes = self.disabled_error_codes.copy()
         new_options.enabled_error_codes = self.enabled_error_codes.copy()
+        if new_options.enable_all_error_codes:
+            new_options.enabled_error_codes = set(error_codes.values())
         for code_str in new_options.disable_error_code:
             code = error_codes[code_str]
             new_options.disabled_error_codes.add(code)
