@@ -437,8 +437,10 @@ class Options:
         return f"Options({pprint.pformat(self.snapshot())})"
 
     def process_error_codes(self, *, error_callback: Callable[[str], Any]) -> None:
+        # This function seems to be standalone so that it can be called after plugins, in various places.
         """Process `--enable-error-code` and `--disable-error-code` flags (and related configurations).
-        This also clears these fields, which were only temporary. The authoritative field to consult is active_error_code.
+        This also clears these fields, which were temporary, and only used for injestion.
+        The persistant field to consult is active_error_code.
         """
         disabled_codes = set(self.disable_error_code)
         enabled_codes = set(self.enable_error_code)
@@ -451,6 +453,7 @@ class Options:
 
         self.active_error_codes -= {error_codes[code] for code in disabled_codes}
         self.active_error_codes |= {error_codes[code] for code in enabled_codes}
+        self.disable_error_code.clear()
         self.enable_error_code.clear()
 
     def process_incomplete_features(
@@ -474,7 +477,8 @@ class Options:
             self.strict_bytes = True
 
     def copy_with_changes(self, changes: dict[str, object]) -> Options:
-        # Note: effects of this method *must* be idempotent.
+        """Return a new Options object that has the changes applied over the old one.
+        Note: effects of this method *must* be idempotent."""
         new_options = Options()
         # Under mypyc, we don't have a __dict__, so we need to do worse things.
         replace_object_state(new_options, self, copy_dict=True)
@@ -482,7 +486,7 @@ class Options:
             setattr(new_options, key, value)
         if changes.get("ignore_missing_imports"):
             # This is the only option for which a per-module and a global
-            # option sometimes beheave differently.
+            # option sometimes behave differently.
             new_options.ignore_missing_imports_per_module = True
         new_options.process_error_codes(
             error_callback=lambda x: print(x, sys.stderr and exit(x)) if x else None
