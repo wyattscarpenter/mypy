@@ -440,9 +440,7 @@ class Options:
         """ Process `--enable-error-code` and `--disable-error-code` flags (and related configurations).
         This also clears these fields, which were only temporary. The authoritative field to consult is active_error_code. """
         disabled_codes = set(self.disable_error_code)
-        print("disabled_codes", disabled_codes)
         enabled_codes = set(self.enable_error_code)
-        print("enabled_codes", enabled_codes)
 
         valid_error_codes = set(error_codes.keys())
 
@@ -452,11 +450,6 @@ class Options:
 
         self.active_error_codes -= {error_codes[code] for code in disabled_codes}
         self.active_error_codes |= {error_codes[code] for code in enabled_codes}
-        if self.active_error_codes == error_codes_on_by_default:
-            print("active error codes are default")
-        else:
-            print_code_set(self.active_error_codes)
-        self.disable_error_code.clear()
         self.enable_error_code.clear()
 
     def process_incomplete_features(
