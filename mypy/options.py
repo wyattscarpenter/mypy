@@ -9,7 +9,7 @@ from re import Pattern
 from typing import Any, Final
 
 from mypy import defaults
-from mypy.errorcodes import ErrorCode, error_codes, error_codes_on_by_default, print_code_set
+from mypy.errorcodes import ErrorCode, error_codes, error_codes_on_by_default
 from mypy.util import get_class_descriptors, replace_object_state
 
 
@@ -21,7 +21,7 @@ class BuildType:
 
 PER_MODULE_OPTIONS: Final = {
     # Please keep this list sorted
-#    "active_error_codes",
+    #    "active_error_codes",
     "allow_redefinition",
     "allow_redefinition_new",
     "allow_untyped_globals",
@@ -437,8 +437,9 @@ class Options:
         return f"Options({pprint.pformat(self.snapshot())})"
 
     def process_error_codes(self, *, error_callback: Callable[[str], Any]) -> None:
-        """ Process `--enable-error-code` and `--disable-error-code` flags (and related configurations).
-        This also clears these fields, which were only temporary. The authoritative field to consult is active_error_code. """
+        """Process `--enable-error-code` and `--disable-error-code` flags (and related configurations).
+        This also clears these fields, which were only temporary. The authoritative field to consult is active_error_code.
+        """
         disabled_codes = set(self.disable_error_code)
         enabled_codes = set(self.enable_error_code)
 
@@ -483,7 +484,9 @@ class Options:
             # This is the only option for which a per-module and a global
             # option sometimes beheave differently.
             new_options.ignore_missing_imports_per_module = True
-        new_options.process_error_codes(error_callback=lambda x: print(x, sys.stderr and exit(x)) if x else None)
+        new_options.process_error_codes(
+            error_callback=lambda x: print(x, sys.stderr and exit(x)) if x else None
+        )
         return new_options
 
     def compare_stable(self, other_snapshot: dict[str, object]) -> bool:
@@ -597,7 +600,7 @@ class Options:
         result: dict[str, object] = {}
         for opt in OPTIONS_AFFECTING_CACHE:
             val = getattr(self, opt)
-            if opt  == "active_error_codes":
+            if opt == "active_error_codes":
                 val = sorted([code.code for code in val])
             result[opt] = val
         return result
