@@ -344,5 +344,3 @@ DEPRECATED: Final = ErrorCode(
 # This copy will not include any error codes defined later in the plugins.
 mypy_error_codes = error_codes.copy()
 mypy_error_codes_on_by_default = error_codes_on_by_default.copy()
-print("### error_codes_on_by_default:")
-print_code_set(error_codes_on_by_default)
