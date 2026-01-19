@@ -829,21 +829,7 @@ class Errors:
         return False
 
     def is_error_code_enabled(self, error_code: ErrorCode) -> bool:
-        if self.options:
-            current_mod_disabled = self.options.disabled_error_codes
-            current_mod_enabled = self.options.enabled_error_codes
-        else:
-            current_mod_disabled = set()
-            current_mod_enabled = set()
-
-        if error_code in current_mod_disabled:
-            return False
-        elif error_code in current_mod_enabled:
-            return True
-        elif error_code.sub_code_of is not None and error_code.sub_code_of in current_mod_disabled:
-            return False
-        else:
-            return error_code.default_enabled
+        return error_code in self.options.active_error_codes
 
     def clear_errors_in_targets(self, path: str, targets: set[str]) -> None:
         """Remove errors in specific fine-grained targets within a file."""
