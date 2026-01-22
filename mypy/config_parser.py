@@ -336,7 +336,10 @@ def parse_config_file(
         updates, report_dirs = parse_section(
             prefix, options, set_strict_flags, section, config_types, stderr
         )
-        options = options.copy_with_changes(updates)
+        #TODO(Wyatt): should this be `options = options.copy_with_changes(updates)`,
+        # or did trying that break everything?
+        for k, v in updates.items():
+            setattr(options, k, v)
         options.report_dirs.update(report_dirs)
 
     for name, section in parser.items():
@@ -497,7 +500,7 @@ def parse_section(
     invalid_options = {
         # Because this field exists on Options,
         # without this proactive checking we would accept it and crash later:
-        "active_error_codes": "disable_error_code",
+        "active_error_codes": "enable_error_code",
         # These used to also be fields on Options, but now are just helpful tips:
         "enabled_error_codes": "enable_error_code",
         "disabled_error_codes": "disable_error_code",

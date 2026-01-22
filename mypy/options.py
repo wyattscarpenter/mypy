@@ -21,7 +21,6 @@ class BuildType:
 
 PER_MODULE_OPTIONS: Final = {
     # Please keep this list sorted
-    #    "active_error_codes",
     "allow_redefinition",
     "allow_redefinition_new",
     "allow_untyped_globals",
@@ -41,6 +40,7 @@ PER_MODULE_OPTIONS: Final = {
     "disallow_untyped_decorators",
     "disallow_untyped_defs",
     "enable_error_code",
+    "extra_checks",
     "follow_imports_for_stubs",
     "follow_imports",
     "follow_untyped_imports",
@@ -438,7 +438,7 @@ class Options:
 
     def process_error_codes(self, *, error_callback: Callable[[str], Any]) -> None:
         # This function seems to be standalone so that it can be called after plugins, in various places.
-        """Process `--enable-error-code` and `--disable-error-code` flags (and related configurations).
+        """Process `enable-error-code` and `disable-error-code` flags.
         This clears those fields, which were temporary, and only used for option injestion.
         The persistant field to consult about error code enablement is active_error_code.
         """
@@ -452,7 +452,7 @@ class Options:
         ) - valid_error_code_names
         if invalid_code_names_here:
             error_callback(f"Invalid error code(s): {', '.join(sorted(invalid_code_names_here))}")
-
+#TODO(Wyatt): I don't think the new way accounts for subcodes
         self.active_error_codes -= {error_codes[code] for code in disabled_code_names}
         self.active_error_codes |= {error_codes[code] for code in enabled_code_names}
         self.disable_error_code.clear()
