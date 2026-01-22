@@ -444,17 +444,12 @@ class Options:
         """
         disabled_code_names = set(self.disable_error_code)
         enabled_code_names = set(self.enable_error_code)
-
-        valid_error_code_names = set(error_codes.keys())
-
-        invalid_code_names_here = (
-            enabled_code_names | disabled_code_names
-        ) - valid_error_code_names
+        valid_code_names = set(error_codes.keys())
+        invalid_code_names_here = (enabled_code_names | disabled_code_names) - valid_code_names
         if invalid_code_names_here:
             error_callback(f"Invalid error code(s): {', '.join(sorted(invalid_code_names_here))}")
-        # TODO(Wyatt): I don't think the new way accounts for subcodes
-        self.active_error_codes -= {error_codes[code] for code in disabled_code_names}
-        self.active_error_codes |= {error_codes[code] for code in enabled_code_names}
+        self.active_error_codes -= {c for n in disabled_code_names for c in error_codes[n].all()}
+        self.active_error_codes |= {c for n in enabled_code_names for c in error_codes[n].all()}
         self.disable_error_code.clear()
         self.enable_error_code.clear()
 
@@ -606,7 +601,8 @@ class Options:
         result: dict[str, object] = {}
         for opt in OPTIONS_AFFECTING_CACHE:
             val = getattr(self, opt)
-            if opt == "active_error_codes":
+            # TODO(WYATT): or... opt == "active_error_codes"?
+            if opt in ("disabled_error_codes", "enabled_error_codes"):
                 val = sorted([code.code for code in val])
             result[opt] = val
         return result

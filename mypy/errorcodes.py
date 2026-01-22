@@ -58,7 +58,7 @@ class ErrorCode:
     def __hash__(self) -> int:
         return hash((self.code,))
 
-    def expand(self) -> set[ErrorCode]:
+    def all(self) -> set[ErrorCode]:
         """Returns a set of this code and every subcode of it.
         May return just this code in a set."""
         return {self} | sub_code_parent_to_children_map[self]

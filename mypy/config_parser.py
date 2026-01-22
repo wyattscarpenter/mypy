@@ -336,8 +336,6 @@ def parse_config_file(
         updates, report_dirs = parse_section(
             prefix, options, set_strict_flags, section, config_types, stderr
         )
-        # TODO(Wyatt): should this be `options = options.copy_with_changes(updates)`,
-        # or did trying that break everything?
         for k, v in updates.items():
             setattr(options, k, v)
         options.report_dirs.update(report_dirs)

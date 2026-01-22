@@ -875,13 +875,14 @@ class Errors:
                 unused_codes_message = f"[{', '.join(unused_ignored_code_names)}]"
             message = f'Unused "type: ignore{unused_codes_message}" comment'
             for unused_code_name in unused_ignored_code_names:
-                unused_code_object = codes.error_codes[unused_code_name]
-                code_names_of_the_children_of_the_unused_code = {
-                    c.code for c in unused_code_object.expand() if c.code is not unused_code_name
-                }
-                narrower = used_ignored_code_names & code_names_of_the_children_of_the_unused_code
-                if narrower:
-                    message += f", use narrower [{', '.join(narrower)}] instead of [{unused_code_name}] code"
+                unused_code_object = codes.error_codes.get(unused_code_name)
+                if unused_code_object is not None:
+                    code_names_of_the_children_of_the_unused_code = {
+                        c.code for c in unused_code_object.all() if c.code is not unused_code_name
+                    }
+                    narrower = used_ignored_code_names & code_names_of_the_children_of_the_unused_code
+                    if narrower:
+                        message += f", use narrower [{', '.join(narrower)}] instead of [{unused_code_name}] code"
             # Don't use report since add_error_info will ignore the error!
             info = ErrorInfo(
                 import_ctx=self.import_context(),
