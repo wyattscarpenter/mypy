@@ -440,7 +440,7 @@ class Options:
         # This function seems to be standalone so that it can be called after plugins, in various places.
         """Process `enable-error-code` and `disable-error-code` flags.
         This clears those fields, which were temporary, and only used for option injestion.
-        The persistant field to consult about error code enablement is active_error_code.
+        The persistent field to consult about error code enablement is active_error_code.
         """
         disabled_code_names = set(self.disable_error_code)
         enabled_code_names = set(self.enable_error_code)
@@ -452,7 +452,7 @@ class Options:
         ) - valid_error_code_names
         if invalid_code_names_here:
             error_callback(f"Invalid error code(s): {', '.join(sorted(invalid_code_names_here))}")
-#TODO(Wyatt): I don't think the new way accounts for subcodes
+        # TODO(Wyatt): I don't think the new way accounts for subcodes
         self.active_error_codes -= {error_codes[code] for code in disabled_code_names}
         self.active_error_codes |= {error_codes[code] for code in enabled_code_names}
         self.disable_error_code.clear()
