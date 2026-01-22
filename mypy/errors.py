@@ -829,21 +829,7 @@ class Errors:
         return False
 
     def is_error_code_enabled(self, error_code: ErrorCode) -> bool:
-        if self.options:
-            current_mod_disabled = self.options.disabled_error_codes
-            current_mod_enabled = self.options.enabled_error_codes
-        else:
-            current_mod_disabled = set()
-            current_mod_enabled = set()
-
-        if error_code in current_mod_disabled:
-            return False
-        elif error_code in current_mod_enabled:
-            return True
-        elif error_code.sub_code_of is not None and error_code.sub_code_of in current_mod_disabled:
-            return False
-        else:
-            return error_code.default_enabled
+        return error_code in self.options.active_error_codes
 
     def clear_errors_in_targets(self, path: str, targets: set[str]) -> None:
         """Remove errors in specific fine-grained targets within a file."""
@@ -868,28 +854,35 @@ class Errors:
             return
         ignored_lines = self.ignored_lines[file]
         used_ignored_lines = self.used_ignored_lines[file]
-        for line, ignored_codes in ignored_lines.items():
+        for line, ignored_code_names in ignored_lines.items():
             if line in self.skipped_lines[file]:
                 continue
-            if codes.UNUSED_IGNORE.code in ignored_codes:
+            if codes.UNUSED_IGNORE.code in ignored_code_names:
                 continue
-            used_ignored_codes = set(used_ignored_lines[line])
-            unused_ignored_codes = [c for c in ignored_codes if c not in used_ignored_codes]
+            used_ignored_code_names = set(used_ignored_lines[line])
+            unused_ignored_code_names = [
+                c for c in ignored_code_names if c not in used_ignored_code_names
+            ]
             # `ignore` is used
-            if not ignored_codes and used_ignored_codes:
+            if not ignored_code_names and used_ignored_code_names:
                 continue
             # All codes appearing in `ignore[...]` are used
-            if ignored_codes and not unused_ignored_codes:
+            if ignored_code_names and not unused_ignored_code_names:
                 continue
             # Display detail only when `ignore[...]` specifies more than one error code
             unused_codes_message = ""
-            if len(ignored_codes) > 1 and unused_ignored_codes:
-                unused_codes_message = f"[{', '.join(unused_ignored_codes)}]"
+            if len(ignored_code_names) > 1 and unused_ignored_code_names:
+                unused_codes_message = f"[{', '.join(unused_ignored_code_names)}]"
             message = f'Unused "type: ignore{unused_codes_message}" comment'
-            for unused in unused_ignored_codes:
-                narrower = set(used_ignored_codes) & codes.sub_code_map[unused]
-                if narrower:
-                    message += f", use narrower [{', '.join(narrower)}] instead of [{unused}] code"
+            for unused_code_name in unused_ignored_code_names:
+                unused_code_object = codes.error_codes.get(unused_code_name)
+                if unused_code_object is not None:
+                    code_names_of_the_children_of_the_unused_code = {
+                        c.code for c in unused_code_object.all() if c.code is not unused_code_name
+                    }
+                    narrower = used_ignored_code_names & code_names_of_the_children_of_the_unused_code
+                    if narrower:
+                        message += f", use narrower [{', '.join(narrower)}] instead of [{unused_code_name}] code"
             # Don't use report since add_error_info will ignore the error!
             info = ErrorInfo(
                 import_ctx=self.import_context(),

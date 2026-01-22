@@ -622,7 +622,7 @@ def do_daemon(args: argparse.Namespace) -> None:
 
         options_dict = pickle.loads(base64.b64decode(args.options_data))
         options_obj = Options()
-        options = options_obj.apply_changes(options_dict)
+        options = options_obj.copy_with_changes(options_dict)
     else:
         options = process_start_options(args.flags, allow_sources=False)
 

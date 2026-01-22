@@ -11,7 +11,12 @@ from typing import Final
 from mypy_extensions import mypyc_attr
 
 error_codes: dict[str, ErrorCode] = {}
-sub_code_map: dict[str, set[str]] = defaultdict(set)
+error_codes_on_by_default: Final[set[ErrorCode]] = set()
+sub_code_parent_to_children_map: dict[ErrorCode, set[ErrorCode]] = defaultdict(set)
+
+
+def print_code_set(error_codes: set[ErrorCode]) -> None:
+    print(sorted([e.code for e in error_codes]))
 
 
 @mypyc_attr(allow_interpreted_subclasses=True)
@@ -24,21 +29,25 @@ class ErrorCode:
         default_enabled: bool = True,
         sub_code_of: ErrorCode | None = None,
     ) -> None:
+        """Create a new error code object, named `code` (this is what the end-user will see).
+        All codes that mypy creates are category 'General', but plugins should use their own category.
+        """
         self.code = code
         self.description = description
         self.category = category
         self.default_enabled = default_enabled
         self.sub_code_of = sub_code_of
         if sub_code_of is not None:
-            assert sub_code_of.sub_code_of is None, "Nested subcategories are not supported"
-            sub_code_map[sub_code_of.code].add(code)
+            assert sub_code_of.sub_code_of is None, "Nested sub-code relations are not supported"
+            sub_code_parent_to_children_map[sub_code_of].add(self)
         error_codes[code] = self
+        if default_enabled:
+            error_codes_on_by_default.add(self)
 
     def __str__(self) -> str:
         return f"<ErrorCode {self.code}>"
 
     def __repr__(self) -> str:
-        """This doesn't fulfill the goals of repr but it's better than the default view."""
         return f"<ErrorCode {self.category}: {self.code}>"
 
     def __eq__(self, other: object) -> bool:
@@ -48,6 +57,11 @@ class ErrorCode:
 
     def __hash__(self) -> int:
         return hash((self.code,))
+
+    def all(self) -> set[ErrorCode]:
+        """Returns a set of this code and every subcode of it.
+        May return just this code in a set."""
+        return {self} | sub_code_parent_to_children_map[self]
 
 
 ATTR_DEFINED: Final = ErrorCode("attr-defined", "Check that attribute exists", "General")
@@ -336,3 +350,4 @@ DEPRECATED: Final = ErrorCode(
 
 # This copy will not include any error codes defined later in the plugins.
 mypy_error_codes = error_codes.copy()
+mypy_error_codes_on_by_default = error_codes_on_by_default.copy()

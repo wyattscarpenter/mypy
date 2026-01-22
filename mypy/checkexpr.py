@@ -4295,7 +4295,7 @@ class ExpressionChecker(ExpressionVisitor[Type], ExpressionCheckerSharedApi):
         # If left_map is None then we know mypy considers the left expression
         # to be redundant.
         if (
-            codes.REDUNDANT_EXPR in self.chk.options.enabled_error_codes
+            codes.REDUNDANT_EXPR in self.chk.options.active_error_codes
             and left_map is None
             # don't report an error if it's intentional
             and not e.right_always
@@ -4783,7 +4783,7 @@ class ExpressionChecker(ExpressionVisitor[Type], ExpressionCheckerSharedApi):
             return NoneType()
 
     def check_reveal_imported(self, expr: RevealExpr) -> None:
-        if codes.UNIMPORTED_REVEAL not in self.chk.options.enabled_error_codes:
+        if codes.UNIMPORTED_REVEAL not in self.chk.options.active_error_codes:
             return
 
         name = ""
@@ -5911,7 +5911,7 @@ class ExpressionChecker(ExpressionVisitor[Type], ExpressionCheckerSharedApi):
                 if true_map:
                     self.chk.push_type_map(true_map)
 
-                if codes.REDUNDANT_EXPR in self.chk.options.enabled_error_codes:
+                if codes.REDUNDANT_EXPR in self.chk.options.active_error_codes:
                     if true_map is None:
                         self.msg.redundant_condition_in_comprehension(False, condition)
                     elif false_map is None:
@@ -5924,7 +5924,7 @@ class ExpressionChecker(ExpressionVisitor[Type], ExpressionCheckerSharedApi):
         # Gain type information from isinstance if it is there
         # but only for the current expression
         if_map, else_map = self.chk.find_isinstance_check(e.cond)
-        if codes.REDUNDANT_EXPR in self.chk.options.enabled_error_codes:
+        if codes.REDUNDANT_EXPR in self.chk.options.active_error_codes:
             if if_map is None:
                 self.msg.redundant_condition_in_if(False, e.cond)
             elif else_map is None:
