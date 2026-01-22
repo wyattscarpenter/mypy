@@ -75,7 +75,7 @@ def main(argv: list[str]) -> None:
     options_obj = Options()
     disable_error_code = options_dict.pop("disable_error_code", [])
     enable_error_code = options_dict.pop("enable_error_code", [])
-    options = options_obj.apply_changes(options_dict)
+    options = options_obj.copy_with_changes(options_dict)
 
     status_file = args.status_file
     server = IPCServer(CONNECTION_NAME, WORKER_CONNECTION_TIMEOUT)

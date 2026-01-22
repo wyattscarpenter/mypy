@@ -11,7 +11,12 @@ from typing import Final
 from mypy_extensions import mypyc_attr
 
 error_codes: dict[str, ErrorCode] = {}
+error_codes_on_by_default: Final[set[ErrorCode]] = set()
 sub_code_map: dict[str, set[str]] = defaultdict(set)
+
+
+def print_code_set(error_codes: set[ErrorCode]) -> None:
+    print(sorted([e.code for e in error_codes]))
 
 
 @mypyc_attr(allow_interpreted_subclasses=True)
@@ -33,6 +38,8 @@ class ErrorCode:
             assert sub_code_of.sub_code_of is None, "Nested subcategories are not supported"
             sub_code_map[sub_code_of.code].add(code)
         error_codes[code] = self
+        if default_enabled:
+            error_codes_on_by_default.add(self)
 
     def __str__(self) -> str:
         return f"<ErrorCode {self.code}>"
@@ -336,3 +343,4 @@ DEPRECATED: Final = ErrorCode(
 
 # This copy will not include any error codes defined later in the plugins.
 mypy_error_codes = error_codes.copy()
+mypy_error_codes_on_by_default = error_codes_on_by_default.copy()

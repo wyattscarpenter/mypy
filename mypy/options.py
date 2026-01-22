@@ -9,7 +9,7 @@ from re import Pattern
 from typing import Any, Final
 
 from mypy import defaults
-from mypy.errorcodes import ErrorCode, error_codes
+from mypy.errorcodes import ErrorCode, error_codes, error_codes_on_by_default
 from mypy.util import get_class_descriptors, replace_object_state
 
 
@@ -29,7 +29,6 @@ PER_MODULE_OPTIONS: Final = {
     "check_untyped_defs",
     "debug_cache",
     "disable_error_code",
-    "disabled_error_codes",
     "disallow_any_decorated",
     "disallow_any_explicit",
     "disallow_any_expr",
@@ -41,7 +40,6 @@ PER_MODULE_OPTIONS: Final = {
     "disallow_untyped_decorators",
     "disallow_untyped_defs",
     "enable_error_code",
-    "enabled_error_codes",
     "extra_checks",
     "follow_imports_for_stubs",
     "follow_imports",
@@ -254,13 +252,15 @@ class Options:
         # Variable names considered False
         self.always_false: list[str] = []
 
-        # Error codes to disable
-        self.disable_error_code: list[str] = []
-        self.disabled_error_codes: set[ErrorCode] = set()
+        # The set of error codes (as ErrorCode objects) we've computed as
+        # being actually enabled or disabled after all is said and done.
+        self.active_error_codes: set[ErrorCode] = error_codes_on_by_default.copy()
 
-        # Error codes to enable
+        # List of error codes we are being instructed to disable
+        self.disable_error_code: list[str] = []
+
+        # List of error codes we are being instructed to enable
         self.enable_error_code: list[str] = []
-        self.enabled_error_codes: set[ErrorCode] = set()
 
         # Use script name instead of __main__
         self.scripts_are_modules = False
@@ -437,7 +437,11 @@ class Options:
         return f"Options({pprint.pformat(self.snapshot())})"
 
     def process_error_codes(self, *, error_callback: Callable[[str], Any]) -> None:
-        """Process `--enable-error-code` and `--disable-error-code` flags."""
+        # This function seems to be standalone so that it can be called after plugins, in various places.
+        """Process `enable-error-code` and `disable-error-code` flags.
+        This clears those fields, which were temporary, and only used for option injestion.
+        The persistant field to consult about error code enablement is active_error_code.
+        """
         disabled_code_names = set(self.disable_error_code)
         enabled_code_names = set(self.enable_error_code)
 
@@ -448,12 +452,11 @@ class Options:
         ) - valid_error_code_names
         if invalid_code_names_here:
             error_callback(f"Invalid error code(s): {', '.join(sorted(invalid_code_names_here))}")
-
-        self.disabled_error_codes |= {error_codes[code] for code in disabled_code_names}
-        self.enabled_error_codes |= {error_codes[code] for code in enabled_code_names}
-
-        # Enabling an error code always overrides disabling
-        self.disabled_error_codes -= self.enabled_error_codes
+#TODO(Wyatt): I don't think the new way accounts for subcodes
+        self.active_error_codes -= {error_codes[code] for code in disabled_code_names}
+        self.active_error_codes |= {error_codes[code] for code in enabled_code_names}
+        self.disable_error_code.clear()
+        self.enable_error_code.clear()
 
     def process_incomplete_features(
         self, *, error_callback: Callable[[str], Any], warning_callback: Callable[[str], Any]
@@ -475,8 +478,9 @@ class Options:
             # forwards compatibility
             self.strict_bytes = True
 
-    def apply_changes(self, changes: dict[str, object]) -> Options:
-        # Note: effects of this method *must* be idempotent.
+    def copy_with_changes(self, changes: dict[str, object]) -> Options:
+        """Return a new Options object that has the changes applied over the old one.
+        Note: effects of this method *must* be idempotent."""
         new_options = Options()
         # Under mypyc, we don't have a __dict__, so we need to do worse things.
         replace_object_state(new_options, self, copy_dict=True)
@@ -484,32 +488,22 @@ class Options:
             setattr(new_options, key, value)
         if changes.get("ignore_missing_imports"):
             # This is the only option for which a per-module and a global
-            # option sometimes beheave differently.
+            # option sometimes behave differently.
             new_options.ignore_missing_imports_per_module = True
-
-        # These two act as overrides, so apply them when cloning.
-        # Similar to global codes enabling overrides disabling, so we start from latter.
-        new_options.disabled_error_codes = self.disabled_error_codes.copy()
-        new_options.enabled_error_codes = self.enabled_error_codes.copy()
-        for code_str in new_options.disable_error_code:
-            code = error_codes[code_str]
-            new_options.disabled_error_codes.add(code)
-            new_options.enabled_error_codes.discard(code)
-        for code_str in new_options.enable_error_code:
-            code = error_codes[code_str]
-            new_options.enabled_error_codes.add(code)
-            new_options.disabled_error_codes.discard(code)
+        new_options.process_error_codes(
+            error_callback=lambda x: print(x, sys.stderr and exit(x)) if x else None
+        )
         return new_options
 
     def compare_stable(self, other_snapshot: dict[str, object]) -> bool:
-        """Compare options in a way that is stable for snapshot() -> apply_changes() roundtrip.
+        """Compare options in a way that is stable for snapshot() -> copy_with_changes() roundtrip.
 
-        This is needed because apply_changes() has non-trivial effects for some flags, so
-        Options().apply_changes(options.snapshot()) may result in a (slightly) different object.
+        This is needed because copy_with_changes() has non-trivial effects for some flags, so
+        Options().copy_with_changes(options.snapshot()) may result in a (slightly) different object.
         """
         return (
-            Options().apply_changes(self.snapshot()).snapshot()
-            == Options().apply_changes(other_snapshot).snapshot()
+            Options().copy_with_changes(self.snapshot()).snapshot()
+            == Options().copy_with_changes(other_snapshot).snapshot()
         )
 
     def build_per_module_cache(self) -> None:
@@ -549,7 +543,7 @@ class Options:
             # on inheriting from parent configs.
             options = self.clone_for_module(key)
             # And then update it with its per-module options.
-            self._per_module_cache[key] = options.apply_changes(self.per_module_options[key])
+            self._per_module_cache[key] = options.copy_with_changes(self.per_module_options[key])
 
         # Add the more structured sections into unused configs, since
         # they only count as used if actually used by a real module.
@@ -590,7 +584,7 @@ class Options:
             for key, pattern in self._glob_options:
                 if pattern.match(module):
                     self.unused_configs.discard(key)
-                    options = options.apply_changes(self.per_module_options[key])
+                    options = options.copy_with_changes(self.per_module_options[key])
 
         # We could update the cache to directly point to modules once
         # they have been looked up, but in testing this made things
@@ -612,7 +606,7 @@ class Options:
         result: dict[str, object] = {}
         for opt in OPTIONS_AFFECTING_CACHE:
             val = getattr(self, opt)
-            if opt in ("disabled_error_codes", "enabled_error_codes"):
+            if opt == "active_error_codes":
                 val = sorted([code.code for code in val])
             result[opt] = val
         return result

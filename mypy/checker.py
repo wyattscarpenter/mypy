@@ -2401,7 +2401,7 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
             if (
                 ok
                 and original_node
-                and codes.MUTABLE_OVERRIDE in self.options.enabled_error_codes
+                and codes.MUTABLE_OVERRIDE in self.options.active_error_codes
                 and self.is_writable_attribute(original_node)
                 and not always_allow_covariant
                 and not is_subtype(original_type, typ, ignore_pos_arg_names=True)
@@ -2421,7 +2421,7 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
             # This method is a subtype of at least one union variant.
             if (
                 original_node
-                and codes.MUTABLE_OVERRIDE in self.options.enabled_error_codes
+                and codes.MUTABLE_OVERRIDE in self.options.active_error_codes
                 and self.is_writable_attribute(original_node)
                 and not always_allow_covariant
             ):
@@ -3659,7 +3659,7 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
         )
         if (
             ok
-            and codes.MUTABLE_OVERRIDE in self.options.enabled_error_codes
+            and codes.MUTABLE_OVERRIDE in self.options.active_error_codes
             and self.is_writable_attribute(base_node)
             and not always_allow_covariant
         ):

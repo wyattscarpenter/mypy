@@ -336,6 +336,8 @@ def parse_config_file(
         updates, report_dirs = parse_section(
             prefix, options, set_strict_flags, section, config_types, stderr
         )
+        #TODO(Wyatt): should this be `options = options.copy_with_changes(updates)`,
+        # or did trying that break everything?
         for k, v in updates.items():
             setattr(options, k, v)
         options.report_dirs.update(report_dirs)
@@ -495,9 +497,11 @@ def parse_section(
     results: dict[str, object] = {}
     report_dirs: dict[str, str] = {}
 
-    # Because these fields exist on Options, without proactive checking, we would accept them
-    # and crash later
     invalid_options = {
+        # Because this field exists on Options,
+        # without this proactive checking we would accept it and crash later:
+        "active_error_codes": "enable_error_code",
+        # These used to also be fields on Options, but now are just helpful tips:
         "enabled_error_codes": "enable_error_code",
         "disabled_error_codes": "disable_error_code",
     }
@@ -579,13 +583,6 @@ def parse_section(
                 set_strict_flags()
             continue
         results[options_key] = v
-
-    # These two flags act as per-module overrides, so store the empty defaults.
-    if "disable_error_code" not in results:
-        results["disable_error_code"] = []
-    if "enable_error_code" not in results:
-        results["enable_error_code"] = []
-
     return results, report_dirs
 
 
@@ -694,24 +691,9 @@ def parse_mypy_comments(
                     '(see "mypy -h" for the list of flags enabled in strict mode)',
                 )
             )
-        # Because this is currently special-cased
-        # (the new_sections for an inline config *always* includes 'disable_error_code' and
-        # 'enable_error_code' fields, usually empty, which overwrite the old ones),
-        # we have to manipulate them specially.
-        # This could use a refactor, but so could the whole subsystem.
-        if (
-            "enable_error_code" in new_sections
-            and isinstance(neec := new_sections["enable_error_code"], list)
-            and isinstance(eec := sections.get("enable_error_code", []), list)
-        ):
-            new_sections["enable_error_code"] = sorted(set(neec + eec))
-        if (
-            "disable_error_code" in new_sections
-            and isinstance(ndec := new_sections["disable_error_code"], list)
-            and isinstance(dec := sections.get("disable_error_code", []), list)
-        ):
-            new_sections["disable_error_code"] = sorted(set(ndec + dec))
+
         sections.update(new_sections)
+
     return sections, errors
 
 

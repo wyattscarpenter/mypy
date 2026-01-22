@@ -56,7 +56,7 @@ def test_parser(testcase: DataDrivenTestCase) -> None:
     # Apply mypy: comments to options.
     comments = get_mypy_comments(source)
     changes, _ = parse_mypy_comments(comments, options)
-    options = options.apply_changes(changes)
+    options = options.copy_with_changes(changes)
 
     try:
         n = parse(
