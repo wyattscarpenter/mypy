@@ -12,7 +12,7 @@ from mypy_extensions import mypyc_attr
 
 error_codes: dict[str, ErrorCode] = {}
 error_codes_on_by_default: Final[set[ErrorCode]] = set()
-sub_code_parent_to_children_map: dict[str, set[str]] = defaultdict(set)
+sub_code_parent_to_children_map: dict[ErrorCode, set[ErrorCode]] = defaultdict(set)
 
 
 def print_code_set(error_codes: set[ErrorCode]) -> None:
@@ -38,8 +38,8 @@ class ErrorCode:
         self.default_enabled = default_enabled
         self.sub_code_of = sub_code_of
         if sub_code_of is not None:
-            assert sub_code_of.sub_code_of is None, "Nested subcategories are not supported"
-            sub_code_parent_to_children_map[sub_code_of.code].add(self)
+            assert sub_code_of.sub_code_of is None, "Nested sub-code relations are not supported"
+            sub_code_parent_to_children_map[sub_code_of].add(self)
         error_codes[code] = self
         if default_enabled:
             error_codes_on_by_default.add(self)
@@ -57,10 +57,11 @@ class ErrorCode:
 
     def __hash__(self) -> int:
         return hash((self.code,))
-    
+
     def expand(self) -> set[ErrorCode]:
         """Returns a set of this code and every subcode of it.
         May return just this code in a set."""
+        return {self} | sub_code_parent_to_children_map[self]
 
 
 ATTR_DEFINED: Final = ErrorCode("attr-defined", "Check that attribute exists", "General")
