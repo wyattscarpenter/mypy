@@ -439,20 +439,22 @@ class Options:
     def process_error_codes(self, *, error_callback: Callable[[str], Any]) -> None:
         # This function seems to be standalone so that it can be called after plugins, in various places.
         """Process `--enable-error-code` and `--disable-error-code` flags (and related configurations).
-        This also clears these fields, which were temporary, and only used for injestion.
-        The persistant field to consult is active_error_code.
+        This clears those fields, which were temporary, and only used for option injestion.
+        The persistant field to consult about error code enablement is active_error_code.
         """
-        disabled_codes = set(self.disable_error_code)
-        enabled_codes = set(self.enable_error_code)
+        disabled_code_names = set(self.disable_error_code)
+        enabled_code_names = set(self.enable_error_code)
 
-        valid_error_codes = set(error_codes.keys())
+        valid_error_code_names = set(error_codes.keys())
 
-        invalid_codes = (enabled_codes | disabled_codes) - valid_error_codes
-        if invalid_codes:
-            error_callback(f"Invalid error code(s): {', '.join(sorted(invalid_codes))}")
+        invalid_code_names_here = (
+            enabled_code_names | disabled_code_names
+        ) - valid_error_code_names
+        if invalid_code_names_here:
+            error_callback(f"Invalid error code(s): {', '.join(sorted(invalid_code_names_here))}")
 
-        self.active_error_codes -= {error_codes[code] for code in disabled_codes}
-        self.active_error_codes |= {error_codes[code] for code in enabled_codes}
+        self.active_error_codes -= {error_codes[code] for code in disabled_code_names}
+        self.active_error_codes |= {error_codes[code] for code in enabled_code_names}
         self.disable_error_code.clear()
         self.enable_error_code.clear()
 

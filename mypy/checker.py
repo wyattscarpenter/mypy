@@ -3391,7 +3391,7 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
                     inferred = None
 
                 # Special case: only non-abstract non-protocol classes can be assigned to
-                # variables with explicit type Type[A], where A is protocol or abstract.
+                # variables with explicit type `Type[A]`, where A is protocol or abstract.
                 p_rvalue_type = get_proper_type(rvalue_type)
                 p_lvalue_type = get_proper_type(lvalue_type)
                 if (
@@ -4664,6 +4664,19 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
                 type_context = lvalue_type
             else:
                 type_context = None
+
+            # TODO: make assignment checking correct in presence of walrus in r.h.s.
+            # Right now we can accept the r.h.s. up to four(!) times. In presence of
+            # walrus this can result in weird false negatives and "back action". A proper
+            # solution would be to:
+            #   * Refactor the code to reduce number of times we accept the r.h.s.
+            #   (two should be enough: empty context + l.h.s. context).
+            #   * For each accept use binder.accumulate_type_assignments() and assign
+            #   the types inferred for context that is ultimately used.
+            # For now we simply disable some logic that is known to cause problems in
+            # presence of walrus, see e.g. testAssignToOptionalTupleWalrus.
+            binder_version = self.binder.version
+
             rvalue_type = self.expr_checker.accept(
                 rvalue, type_context=type_context, always_allow_any=always_allow_any
             )
@@ -4711,6 +4724,7 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
                 # Skip literal types, as they have special logic (for better errors).
                 and not is_literal_type_like(rvalue_type)
                 and not self.simple_rvalue(rvalue)
+                and binder_version == self.binder.version
             ):
                 # Try re-inferring r.h.s. in empty context, and use that if it
                 # results in a narrower type. We don't do this always because this
@@ -4913,11 +4927,13 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
     def infer_context_dependent(
         self, expr: Expression, type_ctx: Type, allow_none_func_call: bool
     ) -> ProperType:
-        """Infer type of an expression with fallback to empty type context."""
-        with self.msg.filter_errors(
-            filter_errors=True, filter_deprecated=True, save_filtered_errors=True
-        ) as msg:
-            with self.local_type_map as type_map:
+        """Infer type of expression with fallback to empty type context."""
+        with self.msg.filter_errors(filter_deprecated=True, save_filtered_errors=True) as msg:
+            with (
+                self.local_type_map as type_map,
+                # Prevent any narrowing (e.g. from walrus) to have effect during second accept.
+                self.binder.frame_context(can_skip=False, discard=True),
+            ):
                 typ = get_proper_type(
                     self.expr_checker.accept(
                         expr, type_ctx, allow_none_return=allow_none_func_call
@@ -4930,9 +4946,7 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
         # If there are errors with the original type context, try re-inferring in empty context.
         original_messages = msg.filtered_errors()
         original_type_map = type_map
-        with self.msg.filter_errors(
-            filter_errors=True, filter_deprecated=True, save_filtered_errors=True
-        ) as msg:
+        with self.msg.filter_errors(filter_deprecated=True, save_filtered_errors=True) as msg:
             with self.local_type_map as type_map:
                 alt_typ = get_proper_type(
                     self.expr_checker.accept(expr, None, allow_none_return=allow_none_func_call)
@@ -6720,6 +6734,7 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
             is_target_for_value_narrowing = is_singleton_identity_type
             should_coerce_literals = True
             should_narrow_by_identity_equality = True
+            enum_comparison_is_ambiguous = False
 
         elif operator in {"==", "!="}:
             is_target_for_value_narrowing = is_singleton_equality_type
@@ -6732,9 +6747,8 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
                     break
 
             expr_types = [operand_types[i] for i in expr_indices]
-            should_narrow_by_identity_equality = not any(
-                map(has_custom_eq_checks, expr_types)
-            ) and not is_ambiguous_mix_of_enums(expr_types)
+            should_narrow_by_identity_equality = not any(map(has_custom_eq_checks, expr_types))
+            enum_comparison_is_ambiguous = True
         else:
             raise AssertionError
 
@@ -6767,11 +6781,18 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
             for i in expr_indices:
                 if i not in narrowable_indices:
                     continue
+                expr_type = coerce_to_literal(operand_types[i])
+                expr_type = try_expanding_sum_type_to_union(expr_type, None)
+                expr_enum_keys = ambiguous_enum_equality_keys(expr_type)
                 for j, target in value_targets:
                     if i == j:
                         continue
-                    expr_type = coerce_to_literal(operand_types[i])
-                    expr_type = try_expanding_sum_type_to_union(expr_type, None)
+                    if (
+                        # See comments in ambiguous_enum_equality_keys
+                        enum_comparison_is_ambiguous
+                        and len(expr_enum_keys | ambiguous_enum_equality_keys(target.item)) > 1
+                    ):
+                        continue
                     if_map, else_map = conditional_types_to_typemaps(
                         operands[i], *conditional_types(expr_type, [target])
                     )
@@ -6781,10 +6802,10 @@ class TypeChecker(NodeVisitor[None], TypeCheckerSharedApi):
             for i in expr_indices:
                 if i not in narrowable_indices:
                     continue
+                expr_type = operand_types[i]
                 for j, target in type_targets:
                     if i == j:
                         continue
-                    expr_type = operand_types[i]
                     if_map, else_map = conditional_types_to_typemaps(
                         operands[i], *conditional_types(expr_type, [target])
                     )
@@ -9373,47 +9394,44 @@ class VarAssignVisitor(TraverserVisitor):
             self.lvalue = False
 
 
-def is_ambiguous_mix_of_enums(types: list[Type]) -> bool:
-    """Do types have IntEnum/StrEnum types that are potentially overlapping with other types?
+def ambiguous_enum_equality_keys(t: Type) -> set[str]:
+    """
+    Used when narrowing types based on equality.
 
-    If True, we shouldn't attempt type narrowing based on enum values, as it gets
-    too ambiguous.
+    Certain kinds of enums can compare equal to values of other types, so doing type math
+    the way `conditional_types` does will be misleading if you expect it to correspond to
+    conditions based on equality comparisons.
 
-    For example, return True if there's an 'int' type together with an IntEnum literal.
-    However, IntEnum together with a literal of the same IntEnum type is not ambiguous.
+    For example, StrEnum classes can compare equal to str values. So if we see
+    `val: StrEnum; if val == "foo": ...` we currently avoid narrowing.
+    Note that we do wish to continue narrowing for `if val == StrEnum.MEMBER: ...`
     """
     # We need these things for this to be ambiguous:
-    #  (1) an IntEnum or StrEnum type
+    #  (1) an IntEnum or StrEnum type or enum subclass of int or str
     #  (2) either a different IntEnum/StrEnum type or a non-enum type ("<other>")
-    #
-    # It would be slightly more correct to calculate this separately for IntEnum and
-    # StrEnum related types, as an IntEnum can't be confused with a StrEnum.
-    return len(_ambiguous_enum_variants(types)) > 1
-
-
-def _ambiguous_enum_variants(types: list[Type]) -> set[str]:
     result = set()
-    for t in types:
-        t = get_proper_type(t)
-        if isinstance(t, UnionType):
-            result.update(_ambiguous_enum_variants(t.items))
-        elif isinstance(t, Instance):
-            if t.last_known_value:
-                result.update(_ambiguous_enum_variants([t.last_known_value]))
-            elif t.type.is_enum and any(
-                base.fullname in ("enum.IntEnum", "enum.StrEnum") for base in t.type.mro
-            ):
-                result.add(t.type.fullname)
-            elif not t.type.is_enum:
-                # These might compare equal to IntEnum/StrEnum types (e.g. Decimal), so
-                # let's be conservative
-                result.add("<other>")
-        elif isinstance(t, LiteralType):
-            result.update(_ambiguous_enum_variants([t.fallback]))
-        elif isinstance(t, NoneType):
-            pass
-        else:
+    t = get_proper_type(t)
+    if isinstance(t, UnionType):
+        for item in t.items:
+            result.update(ambiguous_enum_equality_keys(item))
+    elif isinstance(t, Instance):
+        if t.last_known_value:
+            result.update(ambiguous_enum_equality_keys(t.last_known_value))
+        elif t.type.is_enum and any(
+            base.fullname in ("enum.IntEnum", "enum.StrEnum", "builtins.str", "builtins.int")
+            for base in t.type.mro
+        ):
+            result.add(t.type.fullname)
+        elif not t.type.is_enum:
+            # These might compare equal to IntEnum/StrEnum types (e.g. Decimal), so
+            # let's be conservative
             result.add("<other>")
+    elif isinstance(t, LiteralType):
+        result.update(ambiguous_enum_equality_keys(t.fallback))
+    elif isinstance(t, NoneType):
+        pass
+    else:
+        result.add("<other>")
     return result
 
 
